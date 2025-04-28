@@ -16,6 +16,8 @@ struct UserProfile: Codable {
     var favoriteGames: [String]?    // e.g., ["No Limit Hold'em", "PLO"]
     var bio: String?
     var avatarURL: String?
+    var location: String?
+    var favoriteGame: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -30,6 +32,8 @@ struct UserProfile: Codable {
         case favoriteGames
         case bio
         case avatarURL
+        case location
+        case favoriteGame
     }
 } 
 

@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import FirebaseStorage
 
 class UserService: ObservableObject {
     private let db = Firestore.firestore()
@@ -32,17 +33,26 @@ class UserService: ObservableObject {
             }
             
             print("✅ Successfully fetched profile data")
-            self.currentUserProfile = UserProfile(
-                id: userId,
-                username: data["username"] as? String ?? "",
-                displayName: data["displayName"] as? String,
-                preferredStakes: nil,
-                primaryLocation: nil,
-                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
-                lastActive: (data["lastActive"] as? Timestamp)?.dateValue() ?? Date(),
-                totalSessions: data["totalSessions"] as? Int ?? 0,
-                lifetimeEarnings: data["lifetimeEarnings"] as? Double ?? 0
-            )
+            let avatarURL = data["avatarURL"] as? String
+            print("[DEBUG] Profile avatarURL from Firestore: \(avatarURL ?? "nil")")
+            DispatchQueue.main.async {
+                self.currentUserProfile = UserProfile(
+                    id: userId,
+                    username: data["username"] as? String ?? "",
+                    displayName: data["displayName"] as? String,
+                    preferredStakes: data["preferredStakes"] as? [String],
+                    primaryLocation: data["primaryLocation"] as? String,
+                    createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+                    lastActive: (data["lastActive"] as? Timestamp)?.dateValue() ?? Date(),
+                    totalSessions: data["totalSessions"] as? Int ?? 0,
+                    lifetimeEarnings: data["lifetimeEarnings"] as? Double ?? 0,
+                    favoriteGames: data["favoriteGames"] as? [String],
+                    bio: data["bio"] as? String,
+                    avatarURL: avatarURL,
+                    location: data["location"] as? String,
+                    favoriteGame: data["favoriteGame"] as? String
+                )
+            }
         } catch {
             print("❌ Error fetching profile: \(error)")
             throw error
@@ -77,7 +87,12 @@ class UserService: ObservableObject {
                 createdAt: Date(),
                 lastActive: Date(),
                 totalSessions: 0,
-                lifetimeEarnings: 0
+                lifetimeEarnings: 0,
+                favoriteGames: nil,
+                bio: nil,
+                avatarURL: nil,
+                location: nil,
+                favoriteGame: nil
             )
             
             let docRef = db.collection("users").document(userId)
@@ -92,7 +107,9 @@ class UserService: ObservableObject {
             ])
             
             print("✅ Successfully created profile")
-            self.currentUserProfile = newProfile
+            DispatchQueue.main.async {
+                self.currentUserProfile = newProfile
+            }
             
         } catch let firestoreError as NSError {
             print("❌ Firestore error: \(firestoreError.localizedDescription)")
@@ -109,6 +126,34 @@ class UserService: ObservableObject {
         
         try await db.collection("users").document(userId).updateData(updates)
         try await fetchUserProfile() // Refresh the local profile
+    }
+    
+    func uploadProfileImage(_ image: UIImage, userId: String, completion: @escaping (Result<String, Error>) -> Void) {
+        let storageRef = Storage.storage().reference().child("profile_images/\(userId).jpg")
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            completion(.failure(NSError(domain: "ImageError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not convert image."])) )
+            return
+        }
+        storageRef.putData(imageData, metadata: nil) { metadata, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                if let urlString = url?.absoluteString {
+                    // Ensure we're using HTTPS
+                    let httpsUrlString = urlString.replacingOccurrences(of: "http://", with: "https://")
+                    print("[DEBUG] Firebase Storage download URL: \(httpsUrlString)")
+                    completion(.success(httpsUrlString))
+                } else {
+                    completion(.failure(NSError(domain: "URLError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No URL returned."])) )
+                }
+            }
+        }
     }
 }
 

@@ -2,67 +2,57 @@ import SwiftUI
 
 struct HandSummaryRow: View {
     let hand: ParsedHandHistory
-    
-    private var heroPosition: String {
-        if let hero = hand.raw.players.first(where: { $0.isHero }) {
-            return hero.position ?? "Unknown"
-        }
-        return "Unknown"
-    }
-    
-    private var heroCards: [String] {
-        if let hero = hand.raw.players.first(where: { $0.isHero }) {
-            return hero.cards ?? []
-        }
-        return []
-    }
-    
-    private var heroWon: Bool {
-        guard let distribution = hand.raw.pot.distribution,
-              let hero = hand.raw.players.first(where: { $0.isHero }) else {
-            return false
-        }
-        return distribution.contains { potDist in
-            potDist.playerName == hero.name && potDist.amount > 0
-        }
-    }
+    @State private var showingReplay = false
     
     private func formatMoney(_ amount: Double) -> String {
-        let formatted = String(format: "%.0f", amount)
-        return "$\(formatted)"
+        return "$\(Int(amount))"
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header with blinds and position
+            // Game Info and Profit/Loss
             HStack {
-                Text("\(formatMoney(hand.raw.gameInfo.smallBlind))/\(formatMoney(hand.raw.gameInfo.bigBlind))")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(formatMoney(hand.raw.gameInfo.smallBlind))/\(formatMoney(hand.raw.gameInfo.bigBlind))")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                    if let hero = hand.raw.players.first(where: { $0.isHero }) {
+                        Text(hero.finalHand ?? "")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                }
                 Spacer()
-                
-                Text(heroPosition)
-                    .font(.system(size: 15))
-                    .foregroundColor(.gray)
-            }
-            
-            // Hero's cards
-            HStack(spacing: 4) {
-                ForEach(heroCards, id: \.self) { card in
-                    Text(card)
-                        .font(.system(size: 20))
-                        .foregroundColor(heroWon ? Color.green : Color.red)
+                if let amount = hand.raw.pot.distribution?.first(where: { $0.playerName == hand.raw.players.first(where: { $0.isHero })?.name })?.amount {
+                    Text(amount > 0 ? "+$\(Int(amount))" : "-$\(abs(Int(amount)))")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(amount > 0 ? .green : .red)
                 }
             }
             
-            // Final pot
-            Text("Final pot: \(formatMoney(hand.raw.pot.amount))")
-                .font(.system(size: 15))
-                .foregroundColor(.gray)
+            // Hero's Cards
+            if let hero = hand.raw.players.first(where: { $0.isHero }) {
+                HStack(spacing: 8) {
+                    ForEach(hero.cards ?? [], id: \.self) { card in
+                        CardView(card: Card(from: card))
+                            .frame(width: 32, height: 46)
+                    }
+                    Spacer()
+                    Button(action: { showingReplay = true }) {
+                        Text("Replay Hand")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.black)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                            .cornerRadius(12)
+                    }
+                }
+            }
         }
         .padding(16)
-        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-        .cornerRadius(12)
+        .fullScreenCover(isPresented: $showingReplay) {
+            HandReplayView(hand: hand)
+        }
     }
 } 

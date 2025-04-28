@@ -8,6 +8,20 @@
 		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>firebasestorage.googleapis.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSTemporaryExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+				<key>NSTemporaryExceptionRequiresForwardSecrecy</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 </dict>
 </plist>

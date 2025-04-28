@@ -19,6 +19,7 @@ struct Card: Identifiable {
 
 struct HandReplayView: View {
     let hand: ParsedHandHistory
+    @Environment(\.dismiss) var dismiss
     @State private var currentStreetIndex = 0 
     @State private var currentActionIndex = 0
     @State private var isPlaying = false
@@ -64,32 +65,33 @@ struct HandReplayView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Controls - always at the top, with plenty of space below
-                    HStack(spacing: 20) {
-                        Button(action: startReplay) {
-                            Text(isPlaying ? "Reset" : "Start")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.black)
-                                .frame(width: 100, height: 30)
-                                .background(Color(red: 123/255, green: 255/255, blue: 99/255))
-                                .cornerRadius(8)
+                    // Back and share buttons at the top
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
                         }
-                        
-                        Button(action: nextAction) {
-                            Text("Next")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.black)
-                                .frame(width: 100, height: 30)
-                                .background(Color(red: 123/255, green: 255/255, blue: 99/255))
-                                .opacity(isPlaying && hasMoreActions ? 1 : 0.5)
-                                .cornerRadius(8)
+                        .padding(.leading, 16)
+                        .padding(.top, 8)
+                        Spacer()
+                        Button(action: { /* Share functionality */ }) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
                         }
-                        .disabled(!isPlaying || !hasMoreActions)
+                        .padding(.trailing, 16)
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 15) // Plenty of space from the top
-                    .zIndex(1) // Always on top
+                    .padding(.bottom, 24)
                     
-                    Spacer(minLength: 16) // Space between buttons and table
+                    Spacer()
                     
                     // Poker Table
                     ZStack {
@@ -100,8 +102,8 @@ struct HandReplayView: View {
                                 Ellipse()
                                     .stroke(tableBorderColor, lineWidth: 8)
                             )
-                            .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.83)
-                            .position(x: geometry.size.width / 2, y: geometry.size.height * 0.35)
+                            .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.75)
+                            .position(x: geometry.size.width / 2, y: geometry.size.height * 0.4)
                             .shadow(color: .black.opacity(0.5), radius: 10)
                         
                         // Stack Logo - moved up
@@ -109,7 +111,7 @@ struct HandReplayView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .opacity(0.3)
-                            .offset(y: -geometry.size.height * 0.32)
+                            .offset(y: -geometry.size.height * 0.28)
 
                         // Pot display - centered
                         if potAmount > 0 {
@@ -119,12 +121,12 @@ struct HandReplayView: View {
                                     .foregroundColor(.white.opacity(0.9))
                                 ChipView(amount: potAmount)
                             }
-                            .offset(y: -geometry.size.height * 0.24)
+                            .offset(y: -geometry.size.height * 0.2)
                         }
 
                         // Community Cards - centered, a bit below the pot
                         CommunityCardsView(cards: allCommunityCards)
-                            .offset(y: -geometry.size.height * 0.1) // adjust as needed
+                            .offset(y: -geometry.size.height * 0.08)
 
                         // Player Seats
                         ForEach(hand.raw.players, id: \.seat) { player in
@@ -143,7 +145,38 @@ struct HandReplayView: View {
                             )
                         }
                     }
-                    .frame(height: geometry.size.height * 0.85)
+                    .frame(height: geometry.size.height * 0.75)
+                    
+                    Spacer()
+                        .frame(height: 0) // Collapse this spacer
+                    
+                    // Controls at the bottom
+                    HStack(spacing: 20) {
+                        Button(action: startReplay) {
+                            Text(isPlaying ? "Reset" : "Start")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.black)
+                                .frame(width: 100, height: 36)
+                                .background(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                .cornerRadius(18)
+                        }
+                        
+                        Button(action: nextAction) {
+                            Text("Next")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.black)
+                                .frame(width: 100, height: 36)
+                                .background(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                .opacity(isPlaying && hasMoreActions ? 1 : 0.5)
+                                .cornerRadius(18)
+                        }
+                        .disabled(!isPlaying || !hasMoreActions)
+                    }
+                    .padding(.vertical, 38)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Color.black.opacity(0)
+                    )
                 }
             }
         }
