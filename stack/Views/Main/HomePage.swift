@@ -26,7 +26,6 @@ struct HomePage: View {
         case profile
         case hands
         case sessions
-        case analytics
     }
     
     var body: some View {
@@ -52,9 +51,6 @@ struct HomePage: View {
                 
                 SessionsTab(userId: userId)
                     .tag(Tab.sessions)
-                
-                AnalyticsView(sessionStore: sessionStore)
-                    .tag(Tab.analytics)
             }
 
             CustomTabBar(
@@ -63,7 +59,7 @@ struct HomePage: View {
                 showingMenu: $showingMenu
             )
             .frame(maxHeight: .infinity, alignment: .bottom)
-            .opacity(showingReplay ? 0 : 1) // Hide tab bar when replayer is shown
+            .opacity(showingReplay ? 0 : 1)
             
             if showingMenu {
                 AddMenuOverlay(

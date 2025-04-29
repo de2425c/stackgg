@@ -170,10 +170,25 @@ struct SessionFormView: View {
     
     private var calculatedHoursPlayed: String {
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.minute], from: startTime, to: endTime)
+        let startDateTime = calendar.date(bySettingHour: calendar.component(.hour, from: startTime),
+                                        minute: calendar.component(.minute, from: startTime),
+                                        second: 0,
+                                        of: startDate) ?? startDate
+        
+        var endDateTime = calendar.date(bySettingHour: calendar.component(.hour, from: endTime),
+                                      minute: calendar.component(.minute, from: endTime),
+                                      second: 0,
+                                      of: startDate) ?? startDate
+        
+        // If end time is before start time, it means the session went into the next day
+        if endDateTime < startDateTime {
+            endDateTime = calendar.date(byAdding: .day, value: 1, to: endDateTime) ?? endDateTime
+        }
+        
+        let components = calendar.dateComponents([.minute], from: startDateTime, to: endDateTime)
         let totalMinutes = Double(components.minute ?? 0)
         let hours = totalMinutes / 60.0
-        return String(format: "%.1f", abs(hours))
+        return String(format: "%.1f", hours)
     }
     
     var body: some View {
@@ -299,21 +314,42 @@ struct SessionFormView: View {
         guard let game = selectedGame else { return }
         isLoading = true
         
+        let calendar = Calendar.current
+        let startDateTime = calendar.date(bySettingHour: calendar.component(.hour, from: startTime),
+                                        minute: calendar.component(.minute, from: startTime),
+                                        second: 0,
+                                        of: startDate) ?? startDate
+        
+        var endDateTime = calendar.date(bySettingHour: calendar.component(.hour, from: endTime),
+                                      minute: calendar.component(.minute, from: endTime),
+                                      second: 0,
+                                      of: startDate) ?? startDate
+        
+        // If end time is before start time, it means the session went into the next day
+        if endDateTime < startDateTime {
+            endDateTime = calendar.date(byAdding: .day, value: 1, to: endDateTime) ?? endDateTime
+        }
+        
         let db = Firestore.firestore()
         let sessionData: [String: Any] = [
             "userId": userId,
             "gameType": gameTypes[selectedGameType],
             "gameName": game.name,
             "stakes": game.stakes,
-            "startDate": startDate,
-            "startTime": startTime,
-            "endTime": endTime,
+            "startDate": Timestamp(date: startDateTime),
+            "startTime": Timestamp(date: startDateTime),
+            "endTime": Timestamp(date: endDateTime),
             "hoursPlayed": Double(calculatedHoursPlayed) ?? 0,
             "buyIn": Double(buyIn) ?? 0,
             "cashout": Double(cashout) ?? 0,
             "profit": (Double(cashout) ?? 0) - (Double(buyIn) ?? 0),
             "createdAt": FieldValue.serverTimestamp()
         ]
+        
+        print("Creating session with dates:")
+        print("Start DateTime: \(startDateTime)")
+        print("End DateTime: \(endDateTime)")
+        print("Hours Played: \(calculatedHoursPlayed)")
         
         db.collection("sessions").addDocument(data: sessionData) { error in
             DispatchQueue.main.async {
