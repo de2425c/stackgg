@@ -32,7 +32,7 @@ struct HomePage: View {
                 DashboardView(userId: userId)
                     .tag(Tab.dashboard)
                 
-                FeedView()
+                FeedView(userId: userId)
                     .tag(Tab.feed)
                 
                 Color.clear
