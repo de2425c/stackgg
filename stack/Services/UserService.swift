@@ -40,12 +40,7 @@ class UserService: ObservableObject {
                     id: userId,
                     username: data["username"] as? String ?? "",
                     displayName: data["displayName"] as? String,
-                    preferredStakes: data["preferredStakes"] as? [String],
-                    primaryLocation: data["primaryLocation"] as? String,
                     createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
-                    lastActive: (data["lastActive"] as? Timestamp)?.dateValue() ?? Date(),
-                    totalSessions: data["totalSessions"] as? Int ?? 0,
-                    lifetimeEarnings: data["lifetimeEarnings"] as? Double ?? 0,
                     favoriteGames: data["favoriteGames"] as? [String],
                     bio: data["bio"] as? String,
                     avatarURL: avatarURL,
@@ -82,12 +77,7 @@ class UserService: ObservableObject {
                 id: userId,
                 username: username,
                 displayName: displayName,
-                preferredStakes: nil,
-                primaryLocation: nil,
                 createdAt: Date(),
-                lastActive: Date(),
-                totalSessions: 0,
-                lifetimeEarnings: 0,
                 favoriteGames: nil,
                 bio: nil,
                 avatarURL: nil,
@@ -101,9 +91,6 @@ class UserService: ObservableObject {
                 "username": newProfile.username,
                 "displayName": newProfile.displayName ?? "",
                 "createdAt": Timestamp(date: newProfile.createdAt),
-                "lastActive": Timestamp(date: newProfile.lastActive),
-                "totalSessions": newProfile.totalSessions,
-                "lifetimeEarnings": newProfile.lifetimeEarnings
             ])
             
             print("✅ Successfully created profile")
