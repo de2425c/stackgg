@@ -13,6 +13,19 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
+        
+        // Delay until the window is created on first run
+        DispatchQueue.main.async {
+            if let tbc = UIApplication.shared
+                .windows
+                .first?
+                .rootViewController as? UITabBarController,
+               let vcs = tbc.viewControllers,
+               vcs.count > 5 {
+                tbc.viewControllers = Array(vcs.prefix(5))
+                tbc.moreNavigationController.tabBarItem.isEnabled = false
+            }
+        }
         return true
     }
 }
