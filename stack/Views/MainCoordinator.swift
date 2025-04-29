@@ -4,7 +4,7 @@ import FirebaseFirestore
 
 class AuthViewModel: ObservableObject {
     @Published var authState: AuthState = .loading
-    private let userService = UserService()
+    @Published var userService: UserService
     
     enum AuthState {
         case loading
@@ -13,6 +13,7 @@ class AuthViewModel: ObservableObject {
     }
     
     init() {
+        self.userService = UserService()
         checkAuthState()
     }
     
@@ -32,6 +33,7 @@ class AuthViewModel: ObservableObject {
                     if let error = error as? UserServiceError, error == .permissionDenied {
                         try? Auth.auth().signOut()
                         DispatchQueue.main.async {
+                            self.userService.currentUserProfile = nil // Clear the profile
                             self.authState = .signedOut
                         }
                     } else {
@@ -44,13 +46,14 @@ class AuthViewModel: ObservableObject {
             }
         } else {
             print("👤 No user signed in")
+            self.userService.currentUserProfile = nil // Clear the profile
             self.authState = .signedOut
         }
     }
 }
 
 struct MainCoordinator: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
+    @StateObject var authViewModel: AuthViewModel = AuthViewModel()
     
     var body: some View {
         Group {
@@ -62,12 +65,14 @@ struct MainCoordinator: View {
             case .signedIn:
                 if let userId = Auth.auth().currentUser?.uid {
                     HomePage(userId: userId)
+                        .environmentObject(authViewModel.userService)
                 } else {
                     Text("Error: No user ID available")
                         .foregroundColor(.red)
                 }
             }
         }
+        .environmentObject(authViewModel)
     }
 }
 
