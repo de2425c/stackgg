@@ -7,6 +7,24 @@ class UserService: ObservableObject {
     private let db = Firestore.firestore()
     @Published var currentUserProfile: UserProfile?
     
+    // Helper method to get follower counts
+    private func getFollowerCounts(for userId: String) async throws -> (followers: Int, following: Int) {
+        async let followersCount = db.collection("users")
+            .document(userId)
+            .collection("followers")
+            .count
+            .getAggregation(source: .server)
+            
+        async let followingCount = db.collection("users")
+            .document(userId)
+            .collection("following")
+            .count
+            .getAggregation(source: .server)
+            
+        let (followers, following) = try await (followersCount, followingCount)
+        return (followers.count.intValue, following.count.intValue)
+    }
+    
     func fetchUserProfile() async throws {
         guard let userId = Auth.auth().currentUser?.uid else {
             print("⛔️ fetchUserProfile: No authenticated user")
@@ -32,6 +50,9 @@ class UserService: ObservableObject {
                 throw UserServiceError.invalidData
             }
             
+            // Get follower counts
+            let (followersCount, followingCount) = try await getFollowerCounts(for: userId)
+            
             print("✅ Successfully fetched profile data")
             let avatarURL = data["avatarURL"] as? String
             print("[DEBUG] Profile avatarURL from Firestore: \(avatarURL ?? "nil")")
@@ -45,7 +66,9 @@ class UserService: ObservableObject {
                     bio: data["bio"] as? String,
                     avatarURL: avatarURL,
                     location: data["location"] as? String,
-                    favoriteGame: data["favoriteGame"] as? String
+                    favoriteGame: data["favoriteGame"] as? String,
+                    followersCount: followersCount,
+                    followingCount: followingCount
                 )
             }
         } catch {
@@ -78,11 +101,8 @@ class UserService: ObservableObject {
                 username: username,
                 displayName: displayName,
                 createdAt: Date(),
-                favoriteGames: nil,
-                bio: nil,
-                avatarURL: nil,
-                location: nil,
-                favoriteGame: nil
+                followersCount: 0,
+                followingCount: 0
             )
             
             let docRef = db.collection("users").document(userId)

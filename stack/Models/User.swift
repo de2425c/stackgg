@@ -14,6 +14,11 @@ struct UserProfile: Codable {
     var location: String?
     var favoriteGame: String?
     
+    // Social fields
+    var followersCount: Int
+    var followingCount: Int
+    var isFollowing: Bool? // Client-side only, not stored in Firestore
+    
     enum CodingKeys: String, CodingKey {
         case id
         case username
@@ -24,6 +29,23 @@ struct UserProfile: Codable {
         case avatarURL
         case location
         case favoriteGame
+        case followersCount
+        case followingCount
+    }
+    
+    init(id: String, username: String, displayName: String?, createdAt: Date, favoriteGames: [String]? = nil, bio: String? = nil, avatarURL: String? = nil, location: String? = nil, favoriteGame: String? = nil, followersCount: Int = 0, followingCount: Int = 0, isFollowing: Bool? = nil) {
+        self.id = id
+        self.username = username
+        self.displayName = displayName
+        self.createdAt = createdAt
+        self.favoriteGames = favoriteGames
+        self.bio = bio
+        self.avatarURL = avatarURL
+        self.location = location
+        self.favoriteGame = favoriteGame
+        self.followersCount = followersCount
+        self.followingCount = followingCount
+        self.isFollowing = isFollowing
     }
 } 
 

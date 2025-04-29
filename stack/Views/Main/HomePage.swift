@@ -422,6 +422,29 @@ struct ProfileScreen: View {
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 24)
                             }
+                            
+                            // Social Stats
+                            HStack(spacing: 32) {
+                                VStack(spacing: 4) {
+                                    Text("\(profile.followersCount)")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.white)
+                                    Text("Followers")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                
+                                VStack(spacing: 4) {
+                                    Text("\(profile.followingCount)")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.white)
+                                    Text("Following")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            
                             HStack(spacing: 16) {
                                 if let location = profile.location, !location.isEmpty {
                                     HStack(spacing: 6) {
@@ -504,7 +527,10 @@ struct ProfileScreen: View {
                 }
             }
             .navigationBarHidden(true)
+            .navigationBarBackButtonHidden(true)
+            .navigationTitle("")
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     private func signOut() {
         do {
