@@ -24,8 +24,6 @@ struct HomePage: View {
         case add
         case groups
         case profile
-        case hands
-        case sessions
     }
     
     var body: some View {
@@ -45,12 +43,6 @@ struct HomePage: View {
                 
                 ProfileScreen(userId: userId)
                     .tag(Tab.profile)
-                
-                HandsTab(handStore: handStore)
-                    .tag(Tab.hands)
-                
-                SessionsTab(userId: userId)
-                    .tag(Tab.sessions)
             }
 
             CustomTabBar(
@@ -425,22 +417,26 @@ struct ProfileScreen: View {
                             
                             // Social Stats
                             HStack(spacing: 32) {
-                                VStack(spacing: 4) {
-                                    Text("\(profile.followersCount)")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Text("Followers")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
+                                NavigationLink(destination: FollowListView(userId: userId, listType: .followers)) {
+                                    VStack(spacing: 4) {
+                                        Text("\(profile.followersCount)")
+                                            .font(.system(size: 20, weight: .bold))
+                                            .foregroundColor(.white)
+                                        Text("Followers")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
                                 }
                                 
-                                VStack(spacing: 4) {
-                                    Text("\(profile.followingCount)")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Text("Following")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
+                                NavigationLink(destination: FollowListView(userId: userId, listType: .following)) {
+                                    VStack(spacing: 4) {
+                                        Text("\(profile.followingCount)")
+                                            .font(.system(size: 20, weight: .bold))
+                                            .foregroundColor(.white)
+                                        Text("Following")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
                                 }
                             }
                             .padding(.vertical, 8)

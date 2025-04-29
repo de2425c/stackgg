@@ -1,7 +1,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct UserProfile: Codable {
+struct UserProfile: Codable, Identifiable {
     let id: String              // Firebase Auth UID
     var username: String
     var displayName: String?
@@ -46,6 +46,24 @@ struct UserProfile: Codable {
         self.followersCount = followersCount
         self.followingCount = followingCount
         self.isFollowing = isFollowing
+    }
+    
+    init(dictionary: [String: Any], id: String) throws {
+        self.id = id
+        guard let username = dictionary["username"] as? String else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Missing username"])
+        }
+        self.username = username
+        self.displayName = dictionary["displayName"] as? String
+        self.createdAt = (dictionary["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+        self.favoriteGames = dictionary["favoriteGames"] as? [String]
+        self.bio = dictionary["bio"] as? String
+        self.avatarURL = dictionary["avatarURL"] as? String
+        self.location = dictionary["location"] as? String
+        self.favoriteGame = dictionary["favoriteGame"] as? String
+        self.followersCount = dictionary["followersCount"] as? Int ?? 0
+        self.followingCount = dictionary["followingCount"] as? Int ?? 0
+        self.isFollowing = nil // This is set client-side
     }
 } 
 
