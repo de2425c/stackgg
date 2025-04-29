@@ -3,11 +3,13 @@ import FirebaseFirestore
 
 struct DashboardView: View {
     @StateObject private var handStore: HandStore
+    @StateObject private var sessionStore: SessionStore
     @State private var selectedTab = 0
     private let tabs = ["Analytics", "Hands", "Sessions"]
     
     init(userId: String) {
         _handStore = StateObject(wrappedValue: HandStore(userId: userId))
+        _sessionStore = StateObject(wrappedValue: SessionStore(userId: userId))
     }
     
     var body: some View {
@@ -37,7 +39,7 @@ struct DashboardView: View {
                     
                     // Content
                     TabView(selection: $selectedTab) {
-                        AnalyticsTab(handStore: handStore)
+                        AnalyticsView(sessionStore: sessionStore, handStore: handStore)
                             .tag(0)
                         
                         HandsTab(handStore: handStore)

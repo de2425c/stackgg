@@ -22,14 +22,41 @@ struct Session: Identifiable, Equatable {
         self.gameType = data["gameType"] as? String ?? ""
         self.gameName = data["gameName"] as? String ?? ""
         self.stakes = data["stakes"] as? String ?? ""
-        self.startDate = (data["startDate"] as? Timestamp)?.dateValue() ?? Date()
-        self.startTime = (data["startTime"] as? Timestamp)?.dateValue() ?? Date()
-        self.endTime = (data["endTime"] as? Timestamp)?.dateValue() ?? Date()
+        
+        // More detailed date logging
+        if let startDateTimestamp = data["startDate"] as? Timestamp {
+            self.startDate = startDateTimestamp.dateValue()
+            print("📅 Session \(id) startDate: \(startDateTimestamp.dateValue())")
+        } else {
+            print("⚠️ No startDate timestamp for session \(id)")
+            self.startDate = Date()
+        }
+        
+        if let startTimeTimestamp = data["startTime"] as? Timestamp {
+            self.startTime = startTimeTimestamp.dateValue()
+            print("🕒 Session \(id) startTime: \(startTimeTimestamp.dateValue())")
+        } else {
+            print("⚠️ No startTime timestamp for session \(id)")
+            self.startTime = Date()
+        }
+        
+        if let endTimeTimestamp = data["endTime"] as? Timestamp {
+            self.endTime = endTimeTimestamp.dateValue()
+        } else {
+            self.endTime = Date()
+        }
+        
         self.hoursPlayed = data["hoursPlayed"] as? Double ?? 0
         self.buyIn = data["buyIn"] as? Double ?? 0
         self.cashout = data["cashout"] as? Double ?? 0
         self.profit = data["profit"] as? Double ?? 0
-        self.createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+        
+        if let createdAtTimestamp = data["createdAt"] as? Timestamp {
+            self.createdAt = createdAtTimestamp.dateValue()
+            print("📝 Session \(id) createdAt: \(createdAtTimestamp.dateValue())")
+        } else {
+            self.createdAt = Date()
+        }
     }
     
     static func == (lhs: Session, rhs: Session) -> Bool {
@@ -55,18 +82,46 @@ class SessionStore: ObservableObject {
     private let userId: String
     
     init(userId: String) {
+        print("📱 SessionStore initialized with userId: \(userId)")
         self.userId = userId
         fetchSessions()
     }
     
     func fetchSessions() {
+        print("🔍 Fetching sessions for user: \(userId)")
         db.collection("sessions")
             .whereField("userId", isEqualTo: userId)
             .order(by: "startDate", descending: true)
             .order(by: "startTime", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let documents = snapshot?.documents else { return }
-                self?.sessions = documents.map { Session(id: $0.documentID, data: $0.data()) }
+                if let error = error {
+                    print("❌ Error fetching sessions: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let documents = snapshot?.documents else {
+                    print("⚠️ No documents found in snapshot")
+                    return
+                }
+                
+                print("📄 Received \(documents.count) session documents")
+                
+                self?.sessions = documents.map { document in
+                    let data = document.data()
+                    print("\n🔍 Processing session: \(document.documentID)")
+                    print("Raw startDate: \(String(describing: data["startDate"]))")
+                    print("Raw startTime: \(String(describing: data["startTime"]))")
+                    print("Profit: \(data["profit"] as? Double ?? 0)")
+                    return Session(id: document.documentID, data: data)
+                }
+                
+                print("\n✅ Final sessions array:")
+                self?.sessions.forEach { session in
+                    print("ID: \(session.id)")
+                    print("Date: \(session.startDate)")
+                    print("Profit: \(session.profit)")
+                    print("---")
+                }
             }
     }
     
