@@ -20,19 +20,10 @@ struct SignInView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        // Back button
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .foregroundColor(.white)
-                                .imageScale(.large)
-                        }
-                        .padding(.top, 20)
-                        
                         Text("Sign in")
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
+                            .padding(.top, 20)
                         
                         Text("Enter your username and password")
                             .font(.system(size: 16))

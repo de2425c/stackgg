@@ -509,6 +509,7 @@ struct ProfileScreen: View {
     private func signOut() {
         do {
             try Auth.auth().signOut()
+            userService.currentUserProfile = nil // Clear the profile before state change
             authViewModel.checkAuthState()
         } catch {
             print("Error signing out: \(error)")

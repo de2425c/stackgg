@@ -18,51 +18,79 @@ struct ProfitGraph: View {
             if cumulativeProfitData.isEmpty {
                 Text("No sessions recorded")
                     .foregroundColor(.gray)
-                    .frame(height: 200)
+                    .frame(height: 180)
                     .frame(maxWidth: .infinity)
             } else {
                 // Chart
                 Chart {
+                    // Background gradient area
+                    AreaMark(
+                        x: .value("Date", cumulativeProfitData.first?.0 ?? Date()),
+                        y: .value("Profit", cumulativeProfitData.first?.1 ?? 0)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.1)),
+                                Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.02))
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    
+                    // Line and points
                     ForEach(cumulativeProfitData, id: \.0) { date, profit in
                         LineMark(
                             x: .value("Date", date),
                             y: .value("Profit", profit)
                         )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)),
-                                    Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.7))
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                        .foregroundStyle(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        
+                        PointMark(
+                            x: .value("Date", date),
+                            y: .value("Profit", profit)
                         )
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+                        .foregroundStyle(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                        .symbolSize(25)
                     }
-                    .interpolationMethod(.monotone)
+                    .interpolationMethod(.linear)
                 }
-                .frame(height: 200)
+                .frame(height: 180)
                 .chartXAxis {
                     AxisMarks(position: .bottom) { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.gray.opacity(0.3))
-                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.gray.opacity(0.3))
                         AxisValueLabel(format: .dateTime.month().day())
-                            .foregroundStyle(Color.gray)
+                            .foregroundStyle(Color.gray.opacity(0.7))
                     }
                 }
                 .chartYAxis {
                     AxisMarks { _ in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.gray.opacity(0.3))
-                        AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                            .foregroundStyle(Color.gray.opacity(0.3))
-                        AxisValueLabel(format: .currency(code: "USD"))
-                            .foregroundStyle(Color.gray)
+                        AxisValueLabel(format: .currency(code: "USD").precision(.fractionLength(0)))
+                            .foregroundStyle(Color.gray.opacity(0.7))
                     }
                 }
+                .chartXScale(domain: {
+                    if let first = cumulativeProfitData.first?.0,
+                       let last = cumulativeProfitData.last?.0 {
+                        // Add 1 day padding on each side
+                        let calendar = Calendar.current
+                        let startDate = calendar.date(byAdding: .day, value: -1, to: first) ?? first
+                        let endDate = calendar.date(byAdding: .day, value: 1, to: last) ?? last
+                        return startDate...endDate
+                    }
+                    return Date.now...Date.now
+                }())
+                .chartYScale(domain: { 
+                    if let minProfit = cumulativeProfitData.map({ $0.1 }).min(),
+                       let maxProfit = cumulativeProfitData.map({ $0.1 }).max() {
+                        // Add 20% padding to the profit range
+                        let range = maxProfit - minProfit
+                        let padding = range * 0.2
+                        return (minProfit - padding)...(maxProfit + padding)
+                    }
+                    return 0...1000
+                }())
                 
                 // Session list
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -72,7 +100,7 @@ struct ProfitGraph: View {
                                 Text(formatDate(session.startDate))
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(.gray)
-                                Text("$\(Int(session.profit))")
+                                Text(session.profit >= 0 ? "+$\(Int(session.profit))" : "-$\(abs(Int(session.profit)))")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(session.profit >= 0 ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : .red)
                             }
@@ -94,3 +122,4 @@ struct ProfitGraph: View {
         return formatter.string(from: date)
     }
 } 
+

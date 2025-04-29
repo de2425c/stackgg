@@ -94,51 +94,56 @@ struct TabButton: View {
 struct AnalyticsTab: View {
     @ObservedObject var handStore: HandStore
 
-    private var heroName: String? {
-        handStore.savedHands.first?.hand.raw.players.first(where: { $0.isHero })?.name
-    }
-
     private var biggestWin: SavedHand? {
-        guard let hero = heroName else { return nil }
-        return handStore.savedHands.max(by: { winAmount(for: $0, hero: hero) < winAmount(for: $1, hero: hero) })
+        let win = handStore.savedHands.max(by: { 
+            ($0.hand.raw.pot.heroPnl ?? 0) < ($1.hand.raw.pot.heroPnl ?? 0) 
+        })
+        print("Biggest Win: \(win?.hand.raw.pot.heroPnl ?? 0)")
+        return win
     }
 
     private var biggestLoss: SavedHand? {
-        guard let hero = heroName else { return nil }
-        return handStore.savedHands.min(by: { winAmount(for: $0, hero: hero) < winAmount(for: $1, hero: hero) })
+        let loss = handStore.savedHands.min(by: { 
+            ($0.hand.raw.pot.heroPnl ?? 0) < ($1.hand.raw.pot.heroPnl ?? 0) 
+        })
+        print("Biggest Loss: \(loss?.hand.raw.pot.heroPnl ?? 0)")
+        return loss
     }
 
     private var bestHand: SavedHand? {
-        guard let hero = heroName else { return nil }
-        return handStore.savedHands.max(by: { handRank(for: $0, hero: hero) < handRank(for: $1, hero: hero) })
+        let best = handStore.savedHands.max(by: { handRank(for: $0) < handRank(for: $1) })
+        if let best = best {
+            print("Best Hand: \(best.hand.raw.players.first(where: { $0.isHero })?.finalHand ?? "none")")
+        }
+        return best
     }
 
-    private func winAmount(for savedHand: SavedHand, hero: String) -> Double {
-        guard let dist = savedHand.hand.raw.pot.distribution else { return 0 }
-        return dist.first(where: { $0.playerName == hero })?.amount ?? 0
-    }
-
-    private func handRank(for savedHand: SavedHand, hero: String) -> Int {
+    private func handRank(for savedHand: SavedHand) -> Int {
         let handString = savedHand.hand.raw.players.first(where: { $0.isHero })?.finalHand ?? ""
-        return pokerHandRank(handString)
+        let rank = pokerHandRank(handString)
+        print("Hand: \(handString), Rank: \(rank)")
+        return rank
     }
 
     private func pokerHandRank(_ hand: String) -> Int {
         // Higher is better
         let ranks = [
-            "High Card": 1,
-            "Pair": 2,
-            "Two Pair": 3,
-            "Three of a Kind": 4,
-            "Straight": 5,
-            "Flush": 6,
-            "Full House": 7,
-            "Four of a Kind": 8,
+            "Royal Flush": 10,
             "Straight Flush": 9,
-            "Royal Flush": 10
+            "Four of a Kind": 8,
+            "Full House": 7,
+            "Flush": 6,
+            "Straight": 5,
+            "Three of a Kind": 4,
+            "Two Pair": 3,
+            "Pair": 2,
+            "High Card": 1
         ]
-        for (key, value) in ranks.sorted(by: { $0.value > $1.value }) {
-            if hand.localizedCaseInsensitiveContains(key) { return value }
+        
+        for (key, value) in ranks {
+            if hand.localizedCaseInsensitiveContains(key) { 
+                return value 
+            }
         }
         return 0
     }
@@ -147,16 +152,30 @@ struct AnalyticsTab: View {
         ScrollView {
             VStack(spacing: 24) {
                 if let win = biggestWin {
-                    AnalyticsCard(title: "Biggest Win", savedHand: win, amount: winAmount(for: win, hero: heroName ?? ""), highlightColor: .green)
+                    AnalyticsCard(title: "Biggest Win", savedHand: win, amount: win.hand.raw.pot.heroPnl ?? 0, highlightColor: .green)
                 }
+                
                 if let loss = biggestLoss {
-                    AnalyticsCard(title: "Biggest Loss", savedHand: loss, amount: winAmount(for: loss, hero: heroName ?? ""), highlightColor: Color(red: 1, green: 0.3, blue: 0.3))
+                    AnalyticsCard(title: "Biggest Loss", savedHand: loss, amount: loss.hand.raw.pot.heroPnl ?? 0, highlightColor: Color(red: 1, green: 0.3, blue: 0.3))
                 }
-                if let best = bestHand, handRank(for: best, hero: heroName ?? "") > 0 {
-                    AnalyticsCard(title: "Best Hand", savedHand: best, amount: winAmount(for: best, hero: heroName ?? ""), highlightColor: .blue, showHand: true)
+                
+                if let best = bestHand {
+                    let handString = best.hand.raw.players.first(where: { $0.isHero })?.finalHand ?? "-"
+                    if !handString.isEmpty && handString != "-" {
+                        AnalyticsCard(title: "Best Hand", savedHand: best, amount: best.hand.raw.pot.heroPnl ?? 0, highlightColor: .blue, showHand: true)
+                    }
                 }
             }
             .padding()
+            .onAppear {
+                print("Total hands: \(handStore.savedHands.count)")
+                for hand in handStore.savedHands {
+                    print("Hand PNL: \(hand.hand.raw.pot.heroPnl ?? 0)")
+                    if let hero = hand.hand.raw.players.first(where: { $0.isHero }) {
+                        print("Hand type: \(hero.finalHand ?? "none")")
+                    }
+                }
+            }
         }
     }
 }
@@ -178,6 +197,14 @@ struct AnalyticsCard: View {
     private var handType: String {
         hero?.finalHand ?? "-"
     }
+    
+    private var formattedAmount: String {
+        if amount >= 0 {
+            return "+$\(abs(Int(amount)))"
+        } else {
+            return "-$\(abs(Int(amount)))"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -186,9 +213,9 @@ struct AnalyticsCard: View {
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(highlightColor)
                 Spacer()
-                Text("$\(Int(amount))")
+                Text(formattedAmount)
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(highlightColor)
+                    .foregroundColor(amount >= 0 ? .green : .red)
             }
             Divider().background(Color.white.opacity(0.1))
             HStack(spacing: 16) {
