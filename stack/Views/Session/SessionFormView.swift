@@ -194,9 +194,8 @@ struct SessionFormView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background
-                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
-                    .ignoresSafeArea()
+                // Apply new background view
+                AppBackgroundView()
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
@@ -380,7 +379,7 @@ struct GameOptionCard: View {
             .frame(width: 120, height: 70)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                    .fill(Color.clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(isSelected ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : Color.clear, lineWidth: 2)
@@ -414,7 +413,7 @@ struct DateInputField: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                .fill(Color.clear)
         )
     }
 }
@@ -443,7 +442,7 @@ struct CustomInputField: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                .fill(Color.clear)
         )
     }
 } 

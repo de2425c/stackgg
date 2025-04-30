@@ -28,6 +28,9 @@ struct HomePage: View {
     
     var body: some View {
         ZStack {
+            // Apply new background view
+            AppBackgroundView()
+            
             TabView(selection: $selectedTab) {
                 DashboardView(userId: userId)
                     .tag(Tab.dashboard)
@@ -35,7 +38,7 @@ struct HomePage: View {
                 FeedView(userId: userId)
                     .tag(Tab.feed)
                 
-                Color.clear
+                Color.clear // Placeholder for Add tab
                     .tag(Tab.add)
                 
                 GroupsView()
@@ -44,6 +47,7 @@ struct HomePage: View {
                 ProfileScreen(userId: userId)
                     .tag(Tab.profile)
             }
+            .background(Color.clear)
 
             CustomTabBar(
                 selectedTab: $selectedTab,
@@ -51,6 +55,7 @@ struct HomePage: View {
                 showingMenu: $showingMenu
             )
             .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 0)
             .opacity(showingReplay ? 0 : 1)
             
             if showingMenu {
@@ -82,17 +87,13 @@ struct CustomTabBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Background
-            Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0))
-                .frame(height: 80)
+            // Background - Change to clear
+            Color.clear
+                .frame(height: 65)
                 .overlay(
                     VStack(spacing: 0) {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.2))
-                            .frame(height: 1)
-                            .padding(.horizontal, 24)
-                            .padding(.top, -12)
                         HStack(spacing: 0) {
+                            Spacer(minLength: 6)
                             TabBarButton(
                                 icon: "Dashboard",
                                 title: "Dashboard",
@@ -107,9 +108,9 @@ struct CustomTabBar: View {
                             ZStack {
                                 Color.clear.frame(width: 1, height: 1)
                                 AddButton(userId: userId, showingMenu: $showingMenu)
-                                    .offset(y: -18)
+                                    .offset(y: -24)
                             }
-                            .frame(width: 80)
+                            .frame(width: 80, alignment: .center)
                             Spacer(minLength: 0)
                             TabBarButton(
                                 icon: "Groups",
@@ -121,14 +122,15 @@ struct CustomTabBar: View {
                                 title: "Profile",
                                 isSelected: selectedTab == .profile
                             ) { selectedTab = .profile }
+                            Spacer(minLength: 6)
                         }
                         .padding(.horizontal, 0)
                         .padding(.top, 8)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 22)
                     }
                 )
         }
-        .frame(height: 80)
+        .frame(height: 78)
         .frame(maxWidth: .infinity)
     }
 }
@@ -139,20 +141,23 @@ struct TabBarButton: View {
     let isSelected: Bool
     let action: () -> Void
     
+    private var accentColor: Color {
+        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
+    }
+    
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 28, height: 28)
-                    .padding(.top, 2) // Move icon up a bit
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.top, -2) // Move text up a bit
+                    .frame(width: 40, height: 40)
+                    .padding(.vertical, 6)
+                    .foregroundColor(isSelected ? accentColor : .gray)
+                    .shadow(color: isSelected ? accentColor.opacity(0.4) : .clear, radius: isSelected ? 5 : 0)
             }
-            .foregroundColor(isSelected ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : .gray)
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
     }
 }
@@ -170,7 +175,7 @@ struct AddButton: View {
             ZStack {
                 Circle()
                     .fill(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 60, height: 60)
                     .shadow(color: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.3)), radius: 10)
                 PlusIcon()
                     .frame(width: 28, height: 28)
@@ -178,8 +183,7 @@ struct AddButton: View {
                     .rotationEffect(.degrees(showingMenu ? 45 : 0))
             }
         }
-        .padding(.trailing, 12)
-        .padding(.bottom, 5)
+        .offset(x: 0)
     }
 }
 
@@ -355,8 +359,9 @@ struct HandInputView: View {
 struct GroupsView: View {
     var body: some View {
         ZStack {
-            Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-                .ignoresSafeArea()
+            // Remove background
+            // Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
+            //     .ignoresSafeArea()
             
             Text("Groups Coming Soon")
                 .foregroundColor(.white)
@@ -373,7 +378,9 @@ struct ProfileScreen: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)).ignoresSafeArea()
+                // Apply new background view
+                AppBackgroundView()
+                
                 VStack(spacing: 0) {
                     // STACK logo at the top
                     Text("STACK")
@@ -387,7 +394,8 @@ struct ProfileScreen: View {
                         VStack(spacing: 18) {
                             ZStack {
                                 Circle()
-                                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                    // Change background to clear
+                                    .fill(Color.clear)
                                     .frame(width: 120, height: 120)
                                     .shadow(color: Color.green.opacity(0.18), radius: 12, y: 4)
                                 if let url = profile.avatarURL, let imageURL = URL(string: url) {
@@ -481,9 +489,10 @@ struct ProfileScreen: View {
                         }
                         .padding(.vertical, 32)
                         .frame(maxWidth: .infinity)
+                        // Change background to clear
                         .background(
                             RoundedRectangle(cornerRadius: 32)
-                                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.95)))
+                                .fill(Color.clear)
                                 .shadow(color: .black.opacity(0.18), radius: 16, y: 4)
                         )
                         .padding(.horizontal, 18)
@@ -669,63 +678,6 @@ struct ProfileEditView: View {
     }
 }
 
-struct ProfileImageView: View {
-    let url: URL
-    @State private var image: UIImage?
-    @State private var isLoading = true
-    @State private var error: Error?
-    
-    var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else if isLoading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .gray))
-            } else {
-                Color.gray.opacity(0.3)
-            }
-        }
-        .onAppear {
-            loadImage()
-        }
-    }
-    
-    private func loadImage() {
-        isLoading = true
-        error = nil
-        
-        let session = URLSession(configuration: .default)
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 30
-        
-        session.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isLoading = false
-                
-                if let error = error {
-                    print("Error loading image: \(error)")
-                    self.error = error
-                    return
-                }
-                
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200...299).contains(httpResponse.statusCode) else {
-                    print("Invalid response")
-                    return
-                }
-                
-                if let data = data, let uiImage = UIImage(data: data) {
-                    self.image = uiImage
-                }
-            }
-        }.resume()
-    }
-}
-
 struct AddMenuOverlay: View {
     @Binding var showingMenu: Bool
     let userId: String
@@ -811,7 +763,8 @@ struct HandInputViewSleek: View {
 
     var body: some View {
         ZStack {
-            Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)).ignoresSafeArea()
+            // Change background to clear
+            Color.clear.ignoresSafeArea()
             VStack(spacing: 24) {
                 Text("Add Poker Hand")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -826,7 +779,8 @@ struct HandInputViewSleek: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0)))
+                                // Change background to clear
+                                .fill(Color.clear)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
@@ -856,7 +810,8 @@ struct HandInputViewSleek: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(UIColor(red: 18/255, green: 19/255, blue: 22/255, alpha: 0.98)))
+                        // Change background to clear
+                        .fill(Color.clear)
                 )
                 .padding(.horizontal, 8)
                 if let parsedHand = parsedHand {
@@ -866,7 +821,8 @@ struct HandInputViewSleek: View {
                             .font(.system(.body, design: .monospaced))
                             .padding()
                     }
-                    .background(Color.black.opacity(0.18))
+                    // Change background to clear
+                    .background(Color.clear)
                     .cornerRadius(10)
                     .padding(.horizontal, 8)
                 }
