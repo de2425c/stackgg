@@ -36,10 +36,16 @@ class PostService: ObservableObject {
             }
     }
     
-    private nonisolated func cancelAutoRefresh() {
-        Task { @MainActor in
+    private func cancelAutoRefresh() {
+        // Run on main thread to safely cancel the publisher
+        if Thread.isMainThread {
             autoRefreshCancellable?.cancel()
             autoRefreshCancellable = nil
+        } else {
+            Task { @MainActor in
+                autoRefreshCancellable?.cancel()
+                autoRefreshCancellable = nil
+            }
         }
     }
     
