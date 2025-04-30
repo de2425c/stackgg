@@ -16,8 +16,7 @@ struct SignUpView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-                    .ignoresSafeArea()
+                AppBackgroundView()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {

@@ -3,8 +3,7 @@ import SwiftUI
 struct FeedView: View {
     var body: some View {
         ZStack {
-            Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-                .ignoresSafeArea()
+            AppBackgroundView()
             VStack {
                 Spacer()
                 Text("Coming Soon")

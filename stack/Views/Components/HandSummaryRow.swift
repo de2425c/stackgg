@@ -142,14 +142,7 @@ struct HandSummaryRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 28/255, green: 28/255, blue: 32/255),
-                        Color(red: 25/255, green: 25/255, blue: 28/255)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
+                .fill(Color.clear)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
