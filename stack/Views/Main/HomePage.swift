@@ -16,6 +16,23 @@ struct HomePage: View {
         self.userId = userId
         _sessionStore = StateObject(wrappedValue: SessionStore(userId: userId))
         _handStore = StateObject(wrappedValue: HandStore(userId: userId))
+        
+        // Set up notification observer to switch to feed tab when a hand is shared
+        setupNotificationObserver()
+    }
+    
+    // Set up notification observer
+    private func setupNotificationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SwitchToFeedTab"),
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            // Switch to feed tab when notification is received
+            DispatchQueue.main.async {
+                selectedTab = .feed
+            }
+        }
     }
     
     enum Tab {
@@ -28,8 +45,35 @@ struct HomePage: View {
     
     var body: some View {
         ZStack {
-            // Apply new background view
-            AppBackgroundView()
+            // Background that excludes the tab bar central button
+            ZStack {
+                // Full screen material blur
+                Color.black.opacity(0.5)
+                    .background(.thinMaterial)
+                    .ignoresSafeArea()
+                
+                // Cutout for the + button - positioned at center bottom
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(Color.black.opacity(0.01)) // Nearly transparent
+                            .blendMode(.destinationOut) // This creates the "hole" effect
+                            .frame(width: 70, height: 70)
+                        Spacer()
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .compositingGroup() // Ensures the blendMode works properly
+            
+            // Dim overlay to darken screen outside the menu
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation { showingMenu = false }
+                }
             
             TabView(selection: $selectedTab) {
                 DashboardView(userId: userId)
@@ -38,7 +82,7 @@ struct HomePage: View {
                 FeedView(userId: userId)
                     .tag(Tab.feed)
                 
-                Color.clear 
+                Color.clear // Placeholder for Add tab
                     .tag(Tab.add)
                 
                 GroupsView()
@@ -77,6 +121,10 @@ struct HomePage: View {
         .sheet(isPresented: $showingSessionForm) {
             SessionFormView(userId: userId)
         }
+        .onDisappear {
+            // Remove observer when view disappears
+            NotificationCenter.default.removeObserver(self)
+        }
     }
 }
 
@@ -87,13 +135,8 @@ struct CustomTabBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top divider line
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 0.5)
-            
-            // Completely solid black background
-            Color.black
+            // Background - Change to clear
+            Color.clear
                 .frame(height: 65)
                 .overlay(
                     VStack(spacing: 0) {
@@ -135,7 +178,6 @@ struct CustomTabBar: View {
                     }
                 )
         }
-        .background(Color.black) // Ensure the entire background is solid black
         .frame(height: 78)
         .frame(maxWidth: .infinity)
     }

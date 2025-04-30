@@ -732,7 +732,12 @@ struct ShareHandView: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            if let username = userService.currentUserProfile?.username {
+                            if let displayName = userService.currentUserProfile?.displayName,
+                               !displayName.isEmpty {
+                                Text(displayName)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                            } else if let username = userService.currentUserProfile?.username {
                                 Text(username)
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(.white)
@@ -829,6 +834,8 @@ struct ShareHandView: View {
               let username = userService.currentUserProfile?.username,
               let profileImage = userService.currentUserProfile?.avatarURL else { return }
         
+        let displayName = userService.currentUserProfile?.displayName
+        
         isLoading = true
         
         Task {
@@ -837,18 +844,41 @@ struct ShareHandView: View {
                     content: postText,
                     userId: userId,
                     username: username,
+                    displayName: displayName,
                     profileImage: profileImage,
                     hand: hand
                 )
                 try await postService.fetchPosts()
                 DispatchQueue.main.async {
+                    // Dismiss the share sheet
                     dismiss()
+                    // Close the replayer
                     showingReplay = false
+                    
+                    // Navigate to the feed tab
+                    navigateToFeedTab()
                 }
             } catch {
                 print("Error sharing hand: \(error)")
             }
             isLoading = false
         }
+    }
+    
+    private func navigateToFeedTab() {
+        // Find the top-most view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        
+        // Access the TabView controller in HomePage
+        var current = rootVC
+        while let presented = current.presentedViewController {
+            current = presented
+        }
+        
+        // Post a notification to tell HomePage to switch to the feed tab
+        NotificationCenter.default.post(name: NSNotification.Name("SwitchToFeedTab"), object: nil)
     }
 } 
