@@ -22,6 +22,7 @@ class AuthViewModel: ObservableObject {
         case loading
         case signedOut
         case signedIn
+        case emailVerificationRequired
     }
     
     init() {
@@ -32,6 +33,16 @@ class AuthViewModel: ObservableObject {
     func checkAuthState() {
         if let user = Auth.auth().currentUser {
             print("👤 User is signed in with ID: \(user.uid)")
+            
+            // Check if email is verified
+            if !user.isEmailVerified {
+                print("⚠️ Email not verified, showing verification screen")
+                DispatchQueue.main.async {
+                    self.authState = .emailVerificationRequired
+                }
+                return
+            }
+            
             Task {
                 do {
                     try await userService.fetchUserProfile()
@@ -82,6 +93,8 @@ struct MainCoordinator: View {
                     Text("Error: No user ID available")
                         .foregroundColor(.red)
                 }
+            case .emailVerificationRequired:
+                EmailVerificationView()
             }
         }
         .environmentObject(authViewModel)

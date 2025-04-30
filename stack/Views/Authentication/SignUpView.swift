@@ -10,7 +10,7 @@ struct SignUpView: View {
     @State private var isLoading = false
     @State private var showingError = false
     @State private var errorMessage = ""
-    @State private var showingProfileSetup = false
+    @State private var showingEmailVerification = false
     @StateObject private var authService = AuthService()
     
     var body: some View {
@@ -61,7 +61,7 @@ struct SignUpView: View {
                 }
             }
             .navigationBarItems(leading: Button(action: { 
-                if !showingProfileSetup {
+                if !showingEmailVerification {
                     dismiss()
                 }
             }) {
@@ -74,8 +74,8 @@ struct SignUpView: View {
         } message: {
             Text(errorMessage)
         }
-        .fullScreenCover(isPresented: $showingProfileSetup) {
-            ProfileSetupView(isNewUser: true)
+        .fullScreenCover(isPresented: $showingEmailVerification) {
+            EmailVerificationView()
         }
     }
     
@@ -91,7 +91,8 @@ struct SignUpView: View {
             do {
                 try await authService.signUpWithEmail(email: email, password: password)
                 DispatchQueue.main.async {
-                    showingProfileSetup = true
+                    showingEmailVerification = true
+                    isLoading = false
                 }
             } catch let error as AuthError {
                 DispatchQueue.main.async {

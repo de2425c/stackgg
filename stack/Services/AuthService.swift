@@ -23,6 +23,11 @@ class AuthService: ObservableObject {
                 self.user = result.user
                 self.isAuthenticated = true
             }
+            
+            // Check if the user's email is verified
+            if !result.user.isEmailVerified {
+                throw AuthError.emailNotVerified
+            }
         } catch {
             throw handleFirebaseError(error)
         }
@@ -35,9 +40,33 @@ class AuthService: ObservableObject {
                 self.user = result.user
                 self.isAuthenticated = true
             }
+            
+            // Send email verification
+            try await sendEmailVerification()
         } catch {
             throw handleFirebaseError(error)
         }
+    }
+    
+    func sendEmailVerification() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw AuthError.notAuthenticated
+        }
+        
+        do {
+            try await user.sendEmailVerification()
+        } catch {
+            throw AuthError.verificationEmailFailed
+        }
+    }
+    
+    func reloadUser() async throws -> Bool {
+        guard let user = Auth.auth().currentUser else {
+            throw AuthError.notAuthenticated
+        }
+        
+        try await user.reload()
+        return Auth.auth().currentUser?.isEmailVerified ?? false
     }
     
     func signOut() throws {
@@ -54,6 +83,12 @@ class AuthService: ObservableObject {
     
     private func handleFirebaseError(_ error: Error) -> AuthError {
         let nsError = error as NSError
+        
+        // Handle email verification error separately
+        if error is AuthError {
+            return error as! AuthError
+        }
+        
         switch nsError.code {
         case AuthErrorCode.wrongPassword.rawValue,
              AuthErrorCode.userNotFound.rawValue:
@@ -66,6 +101,10 @@ class AuthService: ObservableObject {
             return .networkError
         case AuthErrorCode.weakPassword.rawValue:
             return .weakPassword
+        case AuthErrorCode.tooManyRequests.rawValue:
+            return .tooManyRequests
+        case AuthErrorCode.userDisabled.rawValue:
+            return .userDisabled
         default:
             return .unknown
         }
@@ -80,6 +119,11 @@ enum AuthError: Error {
     case weakPassword
     case signOutError
     case unknown
+    case emailNotVerified
+    case verificationEmailFailed
+    case notAuthenticated
+    case tooManyRequests
+    case userDisabled
     
     var message: String {
         switch self {
@@ -95,6 +139,16 @@ enum AuthError: Error {
             return "Password must be at least 6 characters long"
         case .signOutError:
             return "Error signing out"
+        case .emailNotVerified:
+            return "Please verify your email before signing in"
+        case .verificationEmailFailed:
+            return "Failed to send verification email"
+        case .notAuthenticated:
+            return "You must be logged in to perform this action"
+        case .tooManyRequests:
+            return "Too many requests. Please try again later"
+        case .userDisabled:
+            return "Your account has been disabled"
         case .unknown:
             return "An unknown error occurred"
         }

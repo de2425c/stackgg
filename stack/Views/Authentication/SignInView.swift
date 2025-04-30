@@ -11,6 +11,7 @@ struct SignInView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showingSignUp = false
+    @State private var showingEmailVerification = false
     
     var body: some View {
         NavigationView {
@@ -69,12 +70,22 @@ struct SignInView: View {
             })
         }
         .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
+            if errorMessage == AuthError.emailNotVerified.message {
+                Button("Verify Now") {
+                    showingEmailVerification = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK") {}
+            }
         } message: {
             Text(errorMessage)
         }
         .sheet(isPresented: $showingSignUp) {
             SignUpView()
+        }
+        .fullScreenCover(isPresented: $showingEmailVerification) {
+            EmailVerificationView()
         }
     }
     
@@ -92,6 +103,11 @@ struct SignInView: View {
                     errorMessage = error.message
                     showingError = true
                     isLoading = false
+                    
+                    // If email is not verified, we'll show a special alert with an option to verify
+                    if case .emailNotVerified = error {
+                        // The alert will have a "Verify Now" button that will trigger showingEmailVerification
+                    }
                 }
             }
         }

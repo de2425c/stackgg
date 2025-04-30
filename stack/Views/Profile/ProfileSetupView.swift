@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ProfileSetupView: View {
     @Environment(\.dismiss) var dismiss
@@ -9,7 +10,14 @@ struct ProfileSetupView: View {
     @State private var isLoading = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    // New states for real-time username checking
+    @State private var isCheckingUsername = false
+    @State private var usernameAvailable: Bool? = nil
+    @State private var lastCheckedUsername = ""
     let isNewUser: Bool
+    
+    // Debounce timer for username checks
+    @State private var usernameCheckTask: Task<Void, Never>?
     
     var body: some View {
         NavigationView {
@@ -39,20 +47,56 @@ struct ProfileSetupView: View {
                                     .foregroundColor(.gray)
                                     .font(.system(size: 14))
                                 
-                                TextField("", text: $username)
-                                    .textFieldStyle(CustomTextFieldStyle())
-                                    .autocapitalization(.none)
-                                    .disableAutocorrection(true)
+                                HStack {
+                                    TextField("", text: $username)
+                                        .textFieldStyle(CustomTextFieldStyle())
+                                        .autocapitalization(.none)
+                                        .disableAutocorrection(true)
+                                        .onChange(of: username) { newValue in
+                                            checkUsername(newValue)
+                                        }
+                                    
+                                    // Username availability indicator
+                                    if !username.isEmpty {
+                                        if isCheckingUsername {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                                .frame(width: 20, height: 20)
+                                        } else if let isAvailable = usernameAvailable {
+                                            Image(systemName: isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                                .foregroundColor(isAvailable ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : .red)
+                                                .frame(width: 20, height: 20)
+                                        }
+                                    }
+                                }
+                                
+                                // Username availability message
+                                if !username.isEmpty && !isCheckingUsername {
+                                    if username == lastCheckedUsername {
+                                        if let isAvailable = usernameAvailable {
+                                            Text(isAvailable ? "Username available!" : "Username already taken")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(isAvailable ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : .red)
+                                        }
+                                    }
+                                }
                             }
                             
                             // Display Name field
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Display Name (optional)")
+                                Text("Display Name")
                                     .foregroundColor(.gray)
                                     .font(.system(size: 14))
                                 
                                 TextField("", text: $displayName)
                                     .textFieldStyle(CustomTextFieldStyle())
+                                
+                                if displayName.isEmpty {
+                                    Text("Display name is required")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.red)
+                                        .padding(.top, 4)
+                                }
                             }
                         }
                         .padding(.top, 32)
@@ -71,10 +115,10 @@ struct ProfileSetupView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(username.isEmpty ? Color.gray : Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                        .background(buttonBackgroundColor)
                         .foregroundColor(.black)
                         .cornerRadius(12)
-                        .disabled(username.isEmpty || isLoading)
+                        .disabled(isButtonDisabled)
                         .padding(.bottom, 16)
                     }
                     .padding(.horizontal, 24)
@@ -90,15 +134,83 @@ struct ProfileSetupView: View {
         }
     }
     
+    // Dynamic button background color based on validation
+    private var buttonBackgroundColor: Color {
+        if isButtonDisabled {
+            return Color.gray
+        }
+        return Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
+    }
+    
+    // Button disabled state
+    private var isButtonDisabled: Bool {
+        username.isEmpty || displayName.isEmpty || isLoading || isCheckingUsername || usernameAvailable == false
+    }
+    
+    // Check username availability in real-time
+    private func checkUsername(_ username: String) {
+        // Cancel any existing task
+        usernameCheckTask?.cancel()
+        
+        // Reset state if empty
+        if username.isEmpty {
+            usernameAvailable = nil
+            isCheckingUsername = false
+            return
+        }
+        
+        // Don't check too short usernames
+        if username.count < 3 {
+            usernameAvailable = false
+            return
+        }
+        
+        // Set checking state
+        isCheckingUsername = true
+        
+        // Debounce username checks by 500ms
+        usernameCheckTask = Task {
+            // Wait to avoid too many requests while typing
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            
+            if Task.isCancelled { return }
+            
+            do {
+                // Query Firestore for existing username
+                let db = Firestore.firestore()
+                let querySnapshot = try await db.collection("users")
+                    .whereField("username", isEqualTo: username)
+                    .getDocuments()
+                
+                if Task.isCancelled { return }
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    lastCheckedUsername = username
+                    usernameAvailable = querySnapshot.documents.isEmpty
+                    isCheckingUsername = false
+                }
+            } catch {
+                if Task.isCancelled { return }
+                
+                // Handle errors
+                await MainActor.run {
+                    isCheckingUsername = false
+                    usernameAvailable = nil
+                }
+            }
+        }
+    }
+    
     private func createProfile() {
-        guard !username.isEmpty else { return }
+        guard !username.isEmpty && !displayName.isEmpty else { return }
         
         isLoading = true
         Task {
             do {
                 try await userService.createUserProfile(
                     username: username,
-                    displayName: displayName.isEmpty ? nil : displayName
+                    displayName: displayName
                 )
                 DispatchQueue.main.async {
                     if isNewUser {

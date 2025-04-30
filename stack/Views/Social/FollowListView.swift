@@ -125,14 +125,26 @@ struct UserListRow: View {
             
             // User Info
             VStack(alignment: .leading, spacing: 4) {
-                Text(user.username)
-                    .foregroundColor(.white)
-                    .font(.system(size: 16, weight: .semibold))
+                if let displayName = user.displayName, !displayName.isEmpty {
+                    Text(displayName)
+                        .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .semibold))
+                    
+                    Text("@\(user.username)")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                } else {
+                    Text(user.username)
+                        .foregroundColor(.white)
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                
                 if let bio = user.bio {
                     Text(bio)
                         .foregroundColor(.gray)
                         .font(.system(size: 14))
                         .lineLimit(1)
+                        .padding(.top, 2)
                 }
             }
             
@@ -290,35 +302,69 @@ class FollowListViewModel: ObservableObject {
             guard let self = self else { return }
             
             self.isLoading = true
-            
-            // Search for users where username contains the query
             let queryLower = query.lowercased()
+            
+            // We'll perform two separate queries (username and displayName) and combine results
+            let dispatchGroup = DispatchGroup()
+            var combinedResults: [UserProfile] = []
+            
+            // Query by username
+            dispatchGroup.enter()
             db.collection("users")
                 .whereField("username", isGreaterThanOrEqualTo: queryLower)
                 .whereField("username", isLessThanOrEqualTo: queryLower + "\u{f8ff}")
                 .limit(to: 20)
                 .getDocuments { [weak self] snapshot, error in
+                    defer { dispatchGroup.leave() }
                     guard let self = self else { return }
                     
                     if let error = error {
-                        print("Error searching users: \(error)")
-                        self.isLoading = false
+                        print("Error searching users by username: \(error)")
                         return
                     }
                     
-                    var results: [UserProfile] = []
+                    for document in snapshot?.documents ?? [] {
+                        if let profile = try? UserProfile(dictionary: document.data(), id: document.documentID) {
+                            combinedResults.append(profile)
+                        }
+                    }
+                }
+            
+            // Query by displayName
+            dispatchGroup.enter()
+            db.collection("users")
+                .whereField("displayName", isGreaterThanOrEqualTo: queryLower)
+                .whereField("displayName", isLessThanOrEqualTo: queryLower + "\u{f8ff}")
+                .limit(to: 20)
+                .getDocuments { [weak self] snapshot, error in
+                    defer { dispatchGroup.leave() }
+                    guard let self = self else { return }
+                    
+                    if let error = error {
+                        print("Error searching users by displayName: \(error)")
+                        return
+                    }
                     
                     for document in snapshot?.documents ?? [] {
                         if let profile = try? UserProfile(dictionary: document.data(), id: document.documentID) {
-                            results.append(profile)
+                            // Only add if not already in results (to avoid duplicates)
+                            if !combinedResults.contains(where: { $0.id == profile.id }) {
+                                combinedResults.append(profile)
+                            }
                         }
                     }
-                    
-                    DispatchQueue.main.async {
-                        self.searchResults = results.sorted { $0.username < $1.username }
-                        self.isLoading = false
-                    }
                 }
+            
+            dispatchGroup.notify(queue: .main) { [weak self] in
+                guard let self = self else { return }
+                self.searchResults = combinedResults.sorted { 
+                    // Sort by displayName or username if displayName is nil
+                    let name1 = $0.displayName ?? $0.username
+                    let name2 = $1.displayName ?? $1.username
+                    return name1 < name2
+                }
+                self.isLoading = false
+            }
         }
     }
     
@@ -326,9 +372,18 @@ class FollowListViewModel: ObservableObject {
         if searchText.isEmpty {
             filteredUsers = users
         } else {
+            let query = searchText.lowercased()
             filteredUsers = users.filter { user in
-                user.username.lowercased().contains(searchText.lowercased()) ||
-                (user.bio?.lowercased().contains(searchText.lowercased()) ?? false)
+                // Check username
+                let usernameMatch = user.username.lowercased().contains(query)
+                
+                // Check display name if available
+                let displayNameMatch = user.displayName?.lowercased().contains(query) ?? false
+                
+                // Check bio if available
+                let bioMatch = user.bio?.lowercased().contains(query) ?? false
+                
+                return usernameMatch || displayNameMatch || bioMatch
             }
         }
     }
