@@ -8,9 +8,9 @@ struct HandSummaryRow: View {
     
     private func formatMoney(_ amount: Double) -> String {
         if amount >= 0 {
-            return "+$\(Int(amount))"
+            return "$\(Int(amount))"
         } else {
-            return "-$\(abs(Int(amount)))"
+            return "$\(abs(Int(amount)))"
         }
     }
     

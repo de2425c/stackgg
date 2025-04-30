@@ -6,6 +6,7 @@ struct Post: Identifiable, Codable {
     let content: String
     let userId: String
     let username: String
+    let displayName: String?
     let createdAt: Date
     var likes: Int
     var comments: Int
@@ -25,6 +26,7 @@ struct Post: Identifiable, Codable {
         case content
         case userId
         case username
+        case displayName
         case createdAt
         case likes
         case comments
@@ -34,12 +36,13 @@ struct Post: Identifiable, Codable {
         case handHistory
     }
     
-    init(id: String, userId: String, content: String, createdAt: Date, username: String, profileImage: String? = nil, imageURLs: [String]? = nil, likes: Int = 0, comments: Int = 0, postType: PostType = .text, handHistory: ParsedHandHistory? = nil) {
+    init(id: String, userId: String, content: String, createdAt: Date, username: String, displayName: String? = nil, profileImage: String? = nil, imageURLs: [String]? = nil, likes: Int = 0, comments: Int = 0, postType: PostType = .text, handHistory: ParsedHandHistory? = nil) {
         self.id = id
         self.userId = userId
         self.content = content
         self.createdAt = createdAt
         self.username = username
+        self.displayName = displayName
         self.profileImage = profileImage
         self.imageURLs = imageURLs
         self.likes = likes
@@ -55,6 +58,7 @@ struct Post: Identifiable, Codable {
         content = try container.decode(String.self, forKey: .content)
         userId = try container.decode(String.self, forKey: .userId)
         username = try container.decode(String.self, forKey: .username)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         likes = try container.decodeIfPresent(Int.self, forKey: .likes) ?? 0
         comments = try container.decodeIfPresent(Int.self, forKey: .comments) ?? 0
@@ -88,6 +92,7 @@ struct Post: Identifiable, Codable {
         self.content = content
         self.createdAt = createdAt
         self.username = username
+        self.displayName = data["displayName"] as? String
         self.profileImage = data["profileImage"] as? String
         self.imageURLs = data["imageURLs"] as? [String]
         self.likes = (data["likes"] as? Int) ?? 0
@@ -123,6 +128,11 @@ struct Post: Identifiable, Codable {
             "comments": comments,
             "postType": postType.rawValue
         ]
+        
+        // Add displayName if present
+        if let displayName = displayName {
+            dict["displayName"] = displayName
+        }
         
         // Encode hand history if present
         if let hand = handHistory,

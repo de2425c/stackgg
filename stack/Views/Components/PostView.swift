@@ -140,9 +140,9 @@ struct HandSummaryView: View {
     
     private var formattedPnl: String {
         if heroPnl >= 0 {
-            return "+$\(Int(heroPnl))"
+            return "$\(Int(heroPnl))"
         } else {
-            return "-$\(abs(Int(heroPnl)))"
+            return "$\(abs(Int(heroPnl)))"
         }
     }
     

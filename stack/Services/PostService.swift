@@ -1,14 +1,43 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseStorage
+import Combine
+import FirebaseAuth
 
 class PostService: ObservableObject {
     @Published var posts: [Post] = []
     @Published var isLoading = false
     @Published var lastDocument: DocumentSnapshot?
+    private var refreshTimer: Timer?
+    private var autoRefreshCancellable: AnyCancellable?
+    
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     private let postsPerPage = 10
+    
+    init() {
+        setupAutoRefresh()
+    }
+    
+    deinit {
+        stopAutoRefresh()
+    }
+    
+    private func setupAutoRefresh() {
+        // Set up auto refresh every 30 seconds
+        autoRefreshCancellable = Timer.publish(every: 30, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                Task {
+                    try? await self?.fetchPosts()
+                }
+            }
+    }
+    
+    private func stopAutoRefresh() {
+        autoRefreshCancellable?.cancel()
+        autoRefreshCancellable = nil
+    }
     
     func fetchPosts() async throws {
         await MainActor.run {
@@ -27,10 +56,27 @@ class PostService: ObservableObject {
         let snapshot = try await query.getDocuments()
         lastDocument = snapshot.documents.last
         
-        let newPosts = try snapshot.documents.compactMap { document in
+        var newPosts = try snapshot.documents.compactMap { document in
             var post = try document.data(as: Post.self)
             post.id = document.documentID
             return post
+        }
+        
+        // Check likes status for the current user
+        if let userId = Auth.auth().currentUser?.uid {
+            for i in 0..<newPosts.count {
+                if let postId = newPosts[i].id {
+                    let likeDoc = try? await db.collection("posts")
+                        .document(postId)
+                        .collection("likes")
+                        .document(userId)
+                        .getDocument()
+                    
+                    if let likeDoc = likeDoc, likeDoc.exists {
+                        newPosts[i].isLiked = true
+                    }
+                }
+            }
         }
         
         await MainActor.run {
@@ -58,10 +104,27 @@ class PostService: ObservableObject {
         let snapshot = try await query.getDocuments()
         self.lastDocument = snapshot.documents.last
         
-        let newPosts = try snapshot.documents.compactMap { document -> Post? in
+        var newPosts = try snapshot.documents.compactMap { document -> Post? in
             var post = try document.data(as: Post.self)
             post.id = document.documentID
             return post
+        }
+        
+        // Check likes status for the current user
+        if let userId = Auth.auth().currentUser?.uid {
+            for i in 0..<newPosts.count {
+                if let postId = newPosts[i].id {
+                    let likeDoc = try? await db.collection("posts")
+                        .document(postId)
+                        .collection("likes")
+                        .document(userId)
+                        .getDocument()
+                    
+                    if let likeDoc = likeDoc, likeDoc.exists {
+                        newPosts[i].isLiked = true
+                    }
+                }
+            }
         }
         
         await MainActor.run {
@@ -85,7 +148,7 @@ class PostService: ObservableObject {
         return downloadURL.absoluteString
     }
     
-    func createPost(content: String, userId: String, username: String, profileImage: String?, images: [UIImage]? = nil) async throws {
+    func createPost(content: String, userId: String, username: String, displayName: String? = nil, profileImage: String?, images: [UIImage]? = nil) async throws {
         let documentRef = db.collection("posts").document()
         
         var imageURLs: [String]? = nil
@@ -106,6 +169,7 @@ class PostService: ObservableObject {
             content: content,
             createdAt: Date(),
             username: username,
+            displayName: displayName,
             profileImage: profileImage,
             imageURLs: imageURLs,
             likes: 0,
@@ -120,7 +184,7 @@ class PostService: ObservableObject {
         }
     }
     
-    func createHandPost(content: String, userId: String, username: String, profileImage: String?, hand: ParsedHandHistory) async throws {
+    func createHandPost(content: String, userId: String, username: String, displayName: String? = nil, profileImage: String?, hand: ParsedHandHistory) async throws {
         let documentRef = db.collection("posts").document()
         
         let post = Post(
@@ -129,6 +193,7 @@ class PostService: ObservableObject {
             content: content,
             createdAt: Date(),
             username: username,
+            displayName: displayName,
             profileImage: profileImage,
             imageURLs: nil,
             likes: 0,

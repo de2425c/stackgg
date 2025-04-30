@@ -16,7 +16,7 @@ struct FeedView: View {
                 VStack(spacing: 0) {
                     // Modern header with gradient - more Twitter-like
                     HStack {
-                        Text("Home")
+                        Text("STACK")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                         Spacer()
@@ -144,20 +144,19 @@ struct PostRow: View {
                     }
                     
                     // Content
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Header
+                    VStack(alignment: .leading, spacing: 3) {
+                        // Name and username row
                         HStack(spacing: 6) {
-                            Text(post.username)
+                            // Display name or username if no display name
+                            Text(post.displayName ?? post.username)
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.white)
                             
-                            Text("·")
-                                .foregroundColor(.gray)
-                            
-                            Text(post.createdAt.timeAgoDisplay())
+                            // Always show @username
+                            Text("@\(post.username)")
                                 .font(.system(size: 15))
                                 .foregroundColor(.gray)
-                                
+                            
                             Spacer()
                             
                             if isCurrentUser {
@@ -173,6 +172,11 @@ struct PostRow: View {
                                 }
                             }
                         }
+                        
+                        // Time row below username
+                        Text(post.createdAt.timeAgoDisplay())
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
                     }
                 }
                 
@@ -182,7 +186,7 @@ struct PostRow: View {
                         .font(.system(size: 16))
                         .foregroundColor(.white)
                         .lineSpacing(5)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 12) // Increased vertical padding
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 60) // Align with the content next to profile image
                     
@@ -226,7 +230,7 @@ struct PostRow: View {
                                     .foregroundColor(post.isLiked ? .red : .gray)
                                 Text("\(post.likes)")
                                     .font(.system(size: 14))
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(post.isLiked ? .red : .gray)
                             }
                         }
                         
@@ -348,10 +352,13 @@ struct NewPostView: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(userProfile.username)
+                            // Display name in Twitter-style
+                            Text(userProfile.displayName ?? userProfile.username)
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(.white)
-                            Text("What's happening?")
+                            
+                            // Username with the @ symbol
+                            Text("@\(userProfile.username)")
                                 .font(.system(size: 15))
                                 .foregroundColor(.gray)
                         }
@@ -498,6 +505,7 @@ struct NewPostView: View {
                     content: postText,
                     userId: userId,
                     username: userProfile.username,
+                    displayName: userProfile.displayName,
                     profileImage: userProfile.avatarURL,
                     images: selectedImages.isEmpty ? nil : selectedImages
                 )
