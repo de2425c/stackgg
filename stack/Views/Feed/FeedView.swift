@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import FirebaseStorage
+import FirebaseFirestore
 
 struct FeedView: View {
     @StateObject private var postService = PostService()
@@ -13,19 +14,33 @@ struct FeedView: View {
         NavigationView {
             ZStack(alignment: .bottomTrailing) {
                 VStack(spacing: 0) {
-                    // Stack Logo Header
+                    // Modern header with gradient
                     HStack {
-                        Image("stack_logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 40)
+                        Text("Home")
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
-                        
                         Spacer()
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                    .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.95)))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.98)),
+                                Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.95))
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        Rectangle()
+                            .frame(height: 0.5)
+                            .foregroundColor(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, -0.5),
+                        alignment: .bottom
+                    )
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {
@@ -35,10 +50,9 @@ struct FeedView: View {
                             }
                         }
                         
-                        LazyVStack(spacing: 0) {
+                        LazyVStack(spacing: 16) {
                             ForEach(postService.posts) { post in
                                 PostRow(post: post)
-                                    .environmentObject(postService)
                                     .onAppear {
                                         if post.id == postService.posts.last?.id {
                                             Task {
@@ -52,31 +66,47 @@ struct FeedView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
                                     .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding()
+                                    .padding(.vertical, 20)
                             }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
                     }
                 }
                 .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
                 
-                // Floating Action Button for Post
+                // Modern floating action button with gradient
                 Button(action: { showingNewPost = true }) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                        .clipShape(Circle())
-                        .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)),
+                                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.8))
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 56, height: 56)
+                            .shadow(color: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.3)), radius: 8, y: 4)
+                        
+                        Image(systemName: "plus")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
-                .padding(.trailing, 24)
-                .padding(.bottom, 24)
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
             }
             .navigationBarHidden(true)
         }
         .sheet(isPresented: $showingNewPost) {
             if let profile = userService.currentUserProfile {
                 NewPostView(userId: userId, userProfile: profile, postService: postService)
+                    .environmentObject(postService)
+                    .environmentObject(userService)
             }
         }
         .onAppear {
@@ -84,148 +114,161 @@ struct FeedView: View {
                 try? await postService.fetchPosts()
             }
         }
+        .environmentObject(postService)
     }
 }
 
 struct PostRow: View {
     let post: Post
-    @State private var isLiked = false
-    @EnvironmentObject var userService: UserService
     @EnvironmentObject var postService: PostService
-    @State private var showDeleteAlert = false
+    @EnvironmentObject var userService: UserService
+    @State private var showingDeleteAlert = false
+    @State private var showingReplay = false
+    
+    private var isCurrentUser: Bool {
+        post.userId == userService.currentUserProfile?.id
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 12) {
-                    // Profile Picture
-                    if let profileImage = post.profileImage {
-                        AsyncImage(url: URL(string: profileImage)) { image in
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        } placeholder: {
-                            Circle()
-                                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                                .overlay(
-                                    Image(systemName: "person.fill")
-                                        .foregroundColor(.gray)
-                                )
-                        }
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                    } else {
+            // Main content
+            HStack(alignment: .top, spacing: 12) {
+                // Profile image
+                if let profileImage = post.profileImage {
+                    AsyncImage(url: URL(string: profileImage)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
                         Circle()
                             .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                            .frame(width: 48, height: 48)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .foregroundColor(.gray)
-                            )
                     }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Header
-                        HStack(spacing: 4) {
-                            Text(post.username)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-                            
-                            Text("·")
-                                .foregroundColor(.gray)
-                            
-                            Text(post.createdAt.timeAgoDisplay())
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
-                        }
-                        
-                        // Content
-                        Text(post.content)
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.leading)
-                            .padding(.vertical, 4)
-                        
-                        // Images
-                        if let imageURLs = post.imageURLs, !imageURLs.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(imageURLs, id: \.self) { url in
-                                        AsyncImage(url: URL(string: url)) { image in
-                                            image
-                                                .resizable()
-                                                .scaledToFill()
-                                        } placeholder: {
-                                            Rectangle()
-                                                .fill(Color.gray.opacity(0.3))
-                                        }
-                                        .frame(width: 200, height: 200)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                            }
-                        }
-                        
-                        // Interaction buttons
-                        HStack(spacing: 24) {
-                            Button(action: { toggleLike() }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: isLiked ? "heart.fill" : "heart")
-                                        .foregroundColor(isLiked ? .red : .gray)
-                                        .font(.system(size: 16))
-                                    Text("\(post.likes)")
-                                        .foregroundColor(.gray)
-                                        .font(.system(size: 14))
-                                }
-                            }
-                            
-                            Button(action: {}) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "bubble.right")
-                                        .foregroundColor(.gray)
-                                        .font(.system(size: 16))
-                                    Text("\(post.comments)")
-                                        .foregroundColor(.gray)
-                                        .font(.system(size: 14))
-                                }
-                            }
-                            
-                            Button(action: {}) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .foregroundColor(.gray)
-                                    .font(.system(size: 16))
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
-                    
-                    Spacer()
-                    
-                    Menu {
-                        if post.userId == userService.currentUserProfile?.id {
-                            Button(role: .destructive, action: { showDeleteAlert = true }) {
-                                Label("Delete Post", systemImage: "trash")
-                            }
-                        }
-                        Button(action: {}) {
-                            Label("Report", systemImage: "exclamationmark.triangle")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(.gray)
-                            .font(.system(size: 16))
-                    }
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
                 }
-                .padding()
+                
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    // Header
+                    HStack(spacing: 4) {
+                        Text(post.username)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("·")
+                            .foregroundColor(.gray)
+                        
+                        Text(post.createdAt.timeAgoDisplay())
+                            .font(.system(size: 15))
+                            .foregroundColor(.gray)
+                    }
+                    
+                    // Post content
+                    Text(post.content)
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .lineSpacing(4)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Hand post content
+                    if post.postType == .hand, let hand = post.handHistory {
+                        HandSummaryView(hand: hand)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                        
+                        Button(action: { showingReplay = true }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Replay")
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                            .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Images
+                    if let imageURLs = post.imageURLs, !imageURLs.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(imageURLs, id: \.self) { url in
+                                    AsyncImage(url: URL(string: url)) { image in
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    } placeholder: {
+                                        Rectangle()
+                                            .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                    }
+                                    .frame(width: 180, height: 180)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    
+                    // Actions
+                    HStack(spacing: 24) {
+                        Button(action: toggleLike) {
+                            HStack(spacing: 4) {
+                                Image(systemName: post.isLiked ? "heart.fill" : "heart")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(post.isLiked ? .red : .gray)
+                                Text("\(post.likes)")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        Button(action: {}) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "message")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                Text("\(post.comments)")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        if isCurrentUser {
+                            Menu {
+                                Button(role: .destructive, action: { showingDeleteAlert = true }) {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                    .padding(4)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.5)))
-            
-            Divider()
-                .frame(height: 8)
-                .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .alert("Delete Post", isPresented: $showDeleteAlert) {
+        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+        .overlay(
+            Rectangle()
+                .frame(height: 0.5)
+                .foregroundColor(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
+                .padding(.horizontal, 16)
+                .padding(.bottom, -0.5),
+            alignment: .bottom
+        )
+        .alert("Delete Post", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 deletePost()
@@ -233,8 +276,12 @@ struct PostRow: View {
         } message: {
             Text("Are you sure you want to delete this post? This action cannot be undone.")
         }
-        .onAppear {
-            isLiked = post.isLiked
+        .sheet(isPresented: $showingReplay) {
+            if let hand = post.handHistory {
+                HandReplayView(hand: hand)
+                    .environmentObject(postService)
+                    .environmentObject(userService)
+            }
         }
     }
     
@@ -250,11 +297,11 @@ struct PostRow: View {
     }
     
     private func toggleLike() {
-        guard let postId = post.id, let userId = userService.currentUserProfile?.id else { return }
+        guard let postId = post.id,
+              let userId = userService.currentUserProfile?.id else { return }
         Task {
             do {
                 try await postService.toggleLike(postId: postId, userId: userId)
-                isLiked.toggle()
             } catch {
                 print("Error toggling like: \(error)")
             }

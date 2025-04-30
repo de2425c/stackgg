@@ -11,8 +11,14 @@ class PostService: ObservableObject {
     private let postsPerPage = 10
     
     func fetchPosts() async throws {
-        isLoading = true
-        defer { isLoading = false }
+        await MainActor.run {
+            isLoading = true
+        }
+        defer { 
+            Task { @MainActor in
+                isLoading = false
+            }
+        }
         
         let query = db.collection("posts")
             .order(by: "createdAt", descending: true)
@@ -21,18 +27,28 @@ class PostService: ObservableObject {
         let snapshot = try await query.getDocuments()
         lastDocument = snapshot.documents.last
         
-        posts = try snapshot.documents.compactMap { document in
+        let newPosts = try snapshot.documents.compactMap { document in
             var post = try document.data(as: Post.self)
             post.id = document.documentID
             return post
+        }
+        
+        await MainActor.run {
+            posts = newPosts
         }
     }
     
     func fetchMorePosts() async throws {
         guard let lastDocument = lastDocument, !isLoading else { return }
         
-        isLoading = true
-        defer { isLoading = false }
+        await MainActor.run {
+            isLoading = true
+        }
+        defer { 
+            Task { @MainActor in
+                isLoading = false
+            }
+        }
         
         let query = db.collection("posts")
             .order(by: "createdAt", descending: true)
@@ -48,7 +64,9 @@ class PostService: ObservableObject {
             return post
         }
         
-        posts.append(contentsOf: newPosts)
+        await MainActor.run {
+            posts.append(contentsOf: newPosts)
+        }
     }
     
     func uploadImage(_ image: UIImage) async throws -> String {
@@ -91,11 +109,39 @@ class PostService: ObservableObject {
             profileImage: profileImage,
             imageURLs: imageURLs,
             likes: 0,
-            comments: 0
+            comments: 0,
+            postType: .text
         )
         
         try await documentRef.setData(from: post)
-        posts.insert(post, at: 0)
+        
+        await MainActor.run {
+            posts.insert(post, at: 0)
+        }
+    }
+    
+    func createHandPost(content: String, userId: String, username: String, profileImage: String?, hand: ParsedHandHistory) async throws {
+        let documentRef = db.collection("posts").document()
+        
+        let post = Post(
+            id: documentRef.documentID,
+            userId: userId,
+            content: content,
+            createdAt: Date(),
+            username: username,
+            profileImage: profileImage,
+            imageURLs: nil,
+            likes: 0,
+            comments: 0,
+            postType: .hand,
+            handHistory: hand
+        )
+        
+        try await documentRef.setData(from: post)
+        
+        await MainActor.run {
+            posts.insert(post, at: 0)
+        }
     }
     
     func toggleLike(postId: String, userId: String) async throws {
@@ -107,23 +153,29 @@ class PostService: ObservableObject {
             // Unlike
             try await likeRef.delete()
             try await postRef.updateData(["likes": FieldValue.increment(Int64(-1))])
-            if let index = posts.firstIndex(where: { $0.id == postId }) {
-                posts[index].likes -= 1
-                posts[index].isLiked = false
+            await MainActor.run {
+                if let index = posts.firstIndex(where: { $0.id == postId }) {
+                    posts[index].likes -= 1
+                    posts[index].isLiked = false
+                }
             }
         } else {
             // Like
             try await likeRef.setData(["timestamp": FieldValue.serverTimestamp()])
             try await postRef.updateData(["likes": FieldValue.increment(Int64(1))])
-            if let index = posts.firstIndex(where: { $0.id == postId }) {
-                posts[index].likes += 1
-                posts[index].isLiked = true
+            await MainActor.run {
+                if let index = posts.firstIndex(where: { $0.id == postId }) {
+                    posts[index].likes += 1
+                    posts[index].isLiked = true
+                }
             }
         }
     }
     
     func deletePost(postId: String) async throws {
         try await db.collection("posts").document(postId).delete()
-        posts.removeAll { $0.id == postId }
+        await MainActor.run {
+            posts.removeAll { $0.id == postId }
+        }
     }
 } 

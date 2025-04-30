@@ -3,6 +3,8 @@ import SwiftUI
 struct HandSummaryRow: View {
     let hand: ParsedHandHistory
     @State private var showingReplay = false
+    @EnvironmentObject var postService: PostService
+    @EnvironmentObject var userService: UserService
     
     private func formatMoney(_ amount: Double) -> String {
         if amount >= 0 {
@@ -161,6 +163,8 @@ struct HandSummaryRow: View {
         }
         .sheet(isPresented: $showingReplay) {
             HandReplayView(hand: hand)
+                .environmentObject(postService)
+                .environmentObject(userService)
         }
     }
 } 

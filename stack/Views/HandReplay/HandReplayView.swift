@@ -33,6 +33,10 @@ struct HandReplayView: View {
     @State private var showPotDistribution = false
     @State private var lastCheckPlayer: String? = nil
     @State private var showCheckAnimation: Bool = false
+    @State private var showingShareSheet = false
+    @State private var showingShareAlert = false
+    @EnvironmentObject var postService: PostService
+    @EnvironmentObject var userService: UserService
     
     private let tableColor = Color(red: 45/255, green: 120/255, blue: 65/255)
     private let tableBorderColor = Color(red: 74/255, green: 54/255, blue: 38/255)
@@ -78,7 +82,7 @@ struct HandReplayView: View {
                         .padding(.leading, 16)
                         .padding(.top, 8)
                         Spacer()
-                        Button(action: { /* Share functionality */ }) {
+                        Button(action: { showingShareAlert = true }) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.white)
@@ -182,6 +186,19 @@ struct HandReplayView: View {
         }
         .onAppear {
             initializeStacks()
+        }
+        .alert("Share Hand", isPresented: $showingShareAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Share to Feed") {
+                showingShareSheet = true
+            }
+        } message: {
+            Text("Would you like to share this hand to your feed?")
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            ShareHandView(hand: hand, showingReplay: $showingShareSheet)
+                .environmentObject(postService)
+                .environmentObject(userService)
         }
     }
     
@@ -652,5 +669,186 @@ extension View {
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal)
+    }
+}
+
+struct ShareHandView: View {
+    let hand: ParsedHandHistory
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var postService: PostService
+    @EnvironmentObject var userService: UserService
+    @State private var postText = ""
+    @State private var isLoading = false
+    @FocusState private var isTextEditorFocused: Bool
+    @Binding var showingReplay: Bool
+    
+    private var heroName: String? {
+        hand.raw.players.first(where: { $0.isHero })?.name
+    }
+    
+    private var heroPnl: Double {
+        hand.raw.pot.heroPnl ?? 0
+    }
+    
+    private var formattedPnl: String {
+        if heroPnl >= 0 {
+            return "+$\(Int(heroPnl))"
+        } else {
+            return "-$\(abs(Int(heroPnl)))"
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)).ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header
+                    HStack(spacing: 12) {
+                        if let profileImage = userService.currentUserProfile?.avatarURL {
+                            AsyncImage(url: URL(string: profileImage)) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } placeholder: {
+                                Circle()
+                                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.gray)
+                                    )
+                            }
+                            .frame(width: 48, height: 48)
+                            .clipShape(Circle())
+                        } else {
+                            Circle()
+                                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                .frame(width: 48, height: 48)
+                                .overlay(
+                                    Image(systemName: "person.fill")
+                                        .foregroundColor(.gray)
+                                )
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let username = userService.currentUserProfile?.username {
+                                Text(username)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            Text("Share your hand")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                    
+                    // Hand Summary
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let hero = hand.raw.players.first(where: { $0.isHero }) {
+                            HStack(spacing: 8) {
+                                ForEach(hero.cards ?? [], id: \.self) { card in
+                                    CardView(card: Card(from: card))
+                                        .frame(width: 32, height: 46)
+                                }
+                            }
+                            
+                            if let finalHand = hero.finalHand {
+                                Text("Best Hand: \(finalHand)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            
+                            Text("P/L: \(formattedPnl)")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(heroPnl >= 0 ? .green : .red)
+                        }
+                    }
+                    .padding()
+                    .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.5)))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                    
+                    // Text Editor
+                    TextEditor(text: $postText)
+                        .focused($isTextEditorFocused)
+                        .foregroundColor(.white)
+                        .font(.system(size: 16))
+                        .frame(maxHeight: .infinity)
+                        .padding()
+                        .background(Color.clear)
+                        .scrollContentBackground(.hidden)
+                    
+                    // Bottom toolbar
+                    HStack {
+                        Spacer()
+                        Text("\(280 - postText.count)")
+                            .foregroundColor(postText.count > 280 ? .red : .gray)
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .padding()
+                    .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.95)))
+                }
+            }
+            .navigationTitle("Share Hand")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: shareHand) {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Share")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .disabled(postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading || postText.count > 280)
+                    .foregroundColor(postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || postText.count > 280 ? .gray : .white)
+                }
+            }
+        }
+        .onAppear {
+            isTextEditorFocused = true
+        }
+    }
+    
+    private func shareHand() {
+        guard !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let userId = userService.currentUserProfile?.id,
+              let username = userService.currentUserProfile?.username,
+              let profileImage = userService.currentUserProfile?.avatarURL else { return }
+        
+        isLoading = true
+        
+        Task {
+            do {
+                try await postService.createHandPost(
+                    content: postText,
+                    userId: userId,
+                    username: username,
+                    profileImage: profileImage,
+                    hand: hand
+                )
+                try await postService.fetchPosts()
+                DispatchQueue.main.async {
+                    dismiss()
+                    showingReplay = false
+                }
+            } catch {
+                print("Error sharing hand: \(error)")
+            }
+            isLoading = false
+        }
     }
 } 

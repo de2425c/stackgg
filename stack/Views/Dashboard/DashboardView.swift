@@ -6,6 +6,10 @@ struct DashboardView: View {
     @StateObject private var sessionStore: SessionStore
     @State private var selectedTab = 0
     private let tabs = ["Analytics", "Hands", "Sessions"]
+    @StateObject private var postService = PostService()
+    @EnvironmentObject var userService: UserService
+    @State private var showingReplay = false
+    @State private var selectedHand: ParsedHandHistory?
     
     init(userId: String) {
         _handStore = StateObject(wrappedValue: HandStore(userId: userId))
@@ -66,6 +70,14 @@ struct DashboardView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $showingReplay) {
+            if let hand = selectedHand {
+                HandReplayView(hand: hand)
+                    .environmentObject(postService)
+                    .environmentObject(userService)
+            }
+        }
+        .environmentObject(postService)
     }
 }
 
