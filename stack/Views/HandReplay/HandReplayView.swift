@@ -47,7 +47,7 @@ struct HandReplayView: View {
         return currentActionIndex < currentStreet.actions.count || currentStreetIndex + 1 < hand.raw.streets.count
     }
     
-    // This is the key change - accumulate all cards as the hand progresses
+    // This ensures we accumulate all community cards as the hand progresses
     private var allCommunityCards: [String] {
         var cards: [String] = []
         for i in 0...min(currentStreetIndex, hand.raw.streets.count - 1) {
@@ -145,7 +145,8 @@ struct HandReplayView: View {
                                 showdownRevealed: showdownRevealed,
                                 isWinner: winningPlayers.contains(player.name),
                                 showPotDistribution: showPotDistribution,
-                                showCheck: showCheckAnimation && lastCheckPlayer == player.name
+                                showCheck: showCheckAnimation && lastCheckPlayer == player.name,
+                                isPlayingHand: isPlaying
                             )
                         }
                     }
@@ -209,6 +210,7 @@ struct HandReplayView: View {
     }
     
     private func startReplay() {
+        // Reset all state
         currentStreetIndex = 0
         currentActionIndex = 0
         isPlaying = true
@@ -216,30 +218,14 @@ struct HandReplayView: View {
         potAmount = 0
         foldedPlayers.removeAll()
         playerBets.removeAll()
-        initializeStacks()
+        showdownRevealed = false
+        winningPlayers.removeAll()
+        showPotDistribution = false
+        lastCheckPlayer = nil
+        showCheckAnimation = false
         
-        // Set initial blind amounts
-        if hand.raw.streets.count > 0 && hand.raw.streets[0].actions.count >= 2 {
-            let preflop = hand.raw.streets[0]
-            
-            // Find small blind action
-            if let sbAction = preflop.actions.first(where: { $0.action.lowercased().contains("small blind") }) {
-                playerBets[sbAction.playerName] = sbAction.amount
-                if let stack = playerStacks[sbAction.playerName] {
-                    playerStacks[sbAction.playerName] = stack - sbAction.amount
-                }
-                potAmount += sbAction.amount
-            }
-            
-            // Find big blind action
-            if let bbAction = preflop.actions.first(where: { $0.action.lowercased().contains("big blind") }) {
-                playerBets[bbAction.playerName] = bbAction.amount
-                if let stack = playerStacks[bbAction.playerName] {
-                    playerStacks[bbAction.playerName] = stack - bbAction.amount
-                }
-                potAmount += bbAction.amount
-            }
-        }
+        // Initialize player stacks to their starting values
+        initializeStacks()
     }
     
     private func nextAction() {
@@ -251,6 +237,7 @@ struct HandReplayView: View {
             if currentActionIndex < currentStreet.actions.count {
                 let action = currentStreet.actions[currentActionIndex]
                 
+                // Check animation handling
                 if action.action.lowercased() == "checks" {
                     lastCheckPlayer = action.playerName
                     showCheckAnimation = true
@@ -264,63 +251,118 @@ struct HandReplayView: View {
                     showCheckAnimation = false
                 }
                 
-                // Update game state based on action
-                switch action.action.lowercased() {
-                case "folds":
-                    foldedPlayers.insert(action.playerName)
-                    playerBets[action.playerName] = 0
-                case "bets", "raises":
-                    if let stack = playerStacks[action.playerName] {
-                        playerStacks[action.playerName] = stack - action.amount
-                        potAmount += action.amount
-                        playerBets[action.playerName] = action.amount
-                    }
-                case "calls":
-                    if let stack = playerStacks[action.playerName] {
-                        playerStacks[action.playerName] = stack - action.amount
-                        potAmount += action.amount
-                        playerBets[action.playerName] = action.amount
-                    }
-                case "small blind", "big blind":
-                    break
-                default:
-                    break
-                }
+                // Process the current action
+                processAction(action)
                 
                 currentActionIndex += 1
             } else if currentStreetIndex + 1 < hand.raw.streets.count {
+                // Move to the next street
                 currentStreetIndex += 1
                 currentActionIndex = 0
+                
+                // Clear bet displays but NOT the pot amount
                 playerBets.removeAll()
             } else {
-                // Handle showdown
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    showdownRevealed = true
-                }
-                
-                // Determine winners and distribute pot
-                if let distribution = hand.raw.pot.distribution {
-                    winningPlayers = Set(distribution.filter { $0.amount > 0 }.map { $0.playerName })
-                    
-                    // Animate pot distribution after a delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                            showPotDistribution = true
-                            
-                            // Update player stacks with winnings
-                            for potDist in distribution {
-                                if let currentStack = playerStacks[potDist.playerName] {
-                                    playerStacks[potDist.playerName] = currentStack + potDist.amount
-                                }
-                            }
-                            potAmount = 0
-                        }
-                    }
-                }
-                
-                isHandComplete = true
+                // No more actions or streets - time for showdown
+                handleShowdown()
             }
         }
+    }
+    
+    private func processAction(_ action: Action) {
+        switch action.action.lowercased() {
+        case "folds":
+            foldedPlayers.insert(action.playerName)
+            playerBets[action.playerName] = nil // Remove any existing bet display
+            
+        case "bets":
+            if let stack = playerStacks[action.playerName] {
+                // Subtract from player's stack
+                playerStacks[action.playerName] = stack - action.amount
+                
+                // Add to pot
+                potAmount += action.amount
+                
+                // Display the bet
+                playerBets[action.playerName] = action.amount
+            }
+            
+        case "raises":
+            if let stack = playerStacks[action.playerName] {
+                // Subtract from player's stack
+                playerStacks[action.playerName] = stack - action.amount
+                
+                // Add to pot
+                potAmount += action.amount
+                
+                // Display the bet
+                playerBets[action.playerName] = action.amount
+            }
+            
+        case "calls":
+            if let stack = playerStacks[action.playerName] {
+                // Subtract from player's stack
+                playerStacks[action.playerName] = stack - action.amount
+                
+                // Add to pot
+                potAmount += action.amount
+                
+                // If player already has a bet, add to it (for blinds or previous street action)
+                if let existingBet = playerBets[action.playerName] {
+                    playerBets[action.playerName] = existingBet + action.amount
+                } else {
+                    playerBets[action.playerName] = action.amount
+                }
+            }
+            
+        case "checks":
+            // No changes to stacks or pot for checks
+            break
+            
+        default:
+            // Handle "Bets" for blinds - special case
+            if action.amount > 0 {
+                if let stack = playerStacks[action.playerName] {
+                    // Subtract from player's stack
+                    playerStacks[action.playerName] = stack - action.amount
+                    
+                    // Add to pot
+                    potAmount += action.amount
+                    
+                    // Display the bet
+                    playerBets[action.playerName] = action.amount
+                }
+            }
+        }
+    }
+    
+    private func handleShowdown() {
+        // Reveal cards at showdown
+        withAnimation(.easeInOut(duration: 0.5)) {
+            showdownRevealed = true
+        }
+        
+        // Determine winners based on pot distribution
+        if let distribution = hand.raw.pot.distribution {
+            winningPlayers = Set(distribution.filter { $0.amount > 0 }.map { $0.playerName })
+            
+            // Animate pot distribution after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    showPotDistribution = true
+                    
+                    // Update player stacks with winnings
+                    for potDist in distribution {
+                        if let currentStack = playerStacks[potDist.playerName] {
+                            playerStacks[potDist.playerName] = currentStack + potDist.amount
+                        }
+                    }
+                    potAmount = 0
+                }
+            }
+        }
+        
+        isHandComplete = true
     }
 }
 
@@ -403,11 +445,17 @@ struct PlayerSeatView: View {
     let isWinner: Bool
     let showPotDistribution: Bool
     let showCheck: Bool
+    let isPlayingHand: Bool
     
     @State private var showCards: Bool = true
     
     var displayName: String {
         isHero ? "Hero" : (player.position ?? "")
+    }
+    
+    // Check if this player is on the button
+    private var isOnButton: Bool {
+        return player.position == "button"
     }
     
     private let positionOrder = [
@@ -466,12 +514,7 @@ struct PlayerSeatView: View {
         // Get the player's current position
         let pos = getPosition()
         
-        // Special handling for hero's bet - place it to the right
-        if isHero {
-            return CGPoint(x: pos.x + 65, y: pos.y) // Increased spacing from 50 to 65
-        }
-        
-        // Calculate vector from center to player
+        // Calculate vector from center to player position
         let vectorX = pos.x - centerX
         let vectorY = pos.y - centerY
         
@@ -480,27 +523,77 @@ struct PlayerSeatView: View {
         let normalizedX = vectorX / length
         let normalizedY = vectorY / length
         
-        // Increased bet distance for more spacing
-        let betDistance: CGFloat = 55 // Increased from 40 to 55
-        let betX = pos.x - (normalizedX * betDistance)
-        let betY = pos.y - (normalizedY * betDistance)
+        // Special positioning for different seat positions
+        if isHero {
+            // For hero, place bet slightly above and to the right
+            return CGPoint(x: pos.x + 70, y: pos.y - 10)
+        } else if player.position == "small blind" || player.position == "big blind" {
+            // For blinds on the left, place bet closer to the center
+            let betDistance: CGFloat = 50
+            return CGPoint(x: pos.x + (betDistance * 0.7), y: pos.y - (betDistance * 0.3))
+        } else if player.position == "cutoff" {
+            // For cutoff on the right, place bet closer to the center
+            let betDistance: CGFloat = 50
+            return CGPoint(x: pos.x - (betDistance * 0.7), y: pos.y - (betDistance * 0.3))
+        } else {
+            // For all other positions, calculate based on vector to center
+            let betDistance: CGFloat = 60
+            let betX = pos.x - (normalizedX * betDistance)
+            let betY = pos.y - (normalizedY * betDistance)
+            
+            return CGPoint(x: betX, y: betY)
+        }
+    }
+    
+    // Position for the dealer button
+    private func getDealerButtonPosition() -> CGPoint {
+        let position = getPosition()
         
-        return CGPoint(x: betX, y: betY)
+        // Position the dealer button based on seat location
+        if isHero {
+            // Bottom center - place button to the left
+            return CGPoint(x: position.x - 55, y: position.y - 2)
+        } else if player.position == "small blind" {
+            // Bottom left - place button to the right
+            return CGPoint(x: position.x + 45, y: position.y - 7)
+        } else if player.position == "cutoff" {
+            // Bottom right - place button to the left
+            return CGPoint(x: position.x - 45, y: position.y - 7)
+        } else if ["hijack", "lojack"].contains(player.position) {
+            // Right side - place button to the left
+            return CGPoint(x: position.x - 45, y: position.y - 2)
+        } else if ["utg", "utg+1", "utg+2"].contains(player.position) {
+            // Left side - place button to the right
+            return CGPoint(x: position.x + 45, y: position.y - 2)
+        } else {
+            // Top - place button below
+            return CGPoint(x: position.x, y: position.y + 35)
+        }
     }
     
     private var shouldShowCards: Bool {
-        if isHero {
-            return !isFolded && player.cards != nil
-        } else {
-            // Show villain's cards if:
-            // 1. They haven't folded
-            // 2. We're at showdown
-            // 3. They have cards to show (either hole cards or final cards)
-            // 4. They won or showed their cards
-            return !isFolded && showdownRevealed && 
-                   ((player.finalCards != nil && !player.finalCards!.isEmpty) || 
-                    (isWinner && player.cards != nil))
+        // If player has folded, don't show cards
+        if isFolded {
+            return false
         }
+        
+        // Otherwise, always show cards (blank or real)
+        return true
+    }
+    
+    // Whether to show the actual card values or just back-faced cards
+    private var shouldRevealCardValues: Bool {
+        // Hero's cards are always revealed if not folded
+        if isHero && !isFolded {
+            return true
+        }
+        
+        // At showdown, reveal cards for non-folded players
+        if showdownRevealed && !isFolded {
+            return true
+        }
+        
+        return false
     }
     
     var body: some View {
@@ -519,23 +612,15 @@ struct PlayerSeatView: View {
             // Main content in a separate ZStack for proper layering
             ZStack {
                 // Cards first (will be behind player info but above table)
-                if !isFolded {
-                    // Show cards based on whether it's hero or villain and if we're at showdown
-                    let cardsToShow: [String] = {
-                        if isHero {
-                            return player.cards ?? ["?", "?"]
-                        } else if showdownRevealed {
-                            if let finalCards = player.finalCards, !finalCards.isEmpty {
-                                return finalCards
-                            }
-                            return player.cards ?? ["?", "?"]
-                        }
-                        return ["?", "?"]
-                    }()
-                    
+                if shouldShowCards {
                     HStack(spacing: isHero ? 12 : 7) {
-                        ForEach(Array(cardsToShow.enumerated()), id: \.offset) { index, card in
-                            if card == "?" {
+                        ForEach(0..<2, id: \.self) { index in
+                            if shouldRevealCardValues, let cards = player.cards, index < cards.count {
+                                // Show the actual card if we should reveal values
+                                CardView(card: Card(from: cards[index]))
+                                    .frame(width: cardWidth, height: cardHeight)
+                            } else {
+                                // Otherwise show a blank card
                                 ZStack {
                                     RoundedRectangle(cornerRadius: isHero ? 7 : 5)
                                         .fill(Color.gray)
@@ -544,13 +629,7 @@ struct PlayerSeatView: View {
                                             RoundedRectangle(cornerRadius: isHero ? 7 : 5)
                                                 .stroke(Color.white, lineWidth: 1)
                                         )
-                                    Text("?")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.white)
                                 }
-                            } else {
-                                CardView(card: Card(from: card))
-                                    .frame(width: cardWidth, height: cardHeight)
                             }
                         }
                     }
@@ -598,6 +677,14 @@ struct PlayerSeatView: View {
             }
             .position(x: position.x, y: position.y)
             
+            // Dealer button only for the player on the button
+            if isOnButton {
+                DealerButtonView()
+                    .scaleEffect(0.8)
+                    .position(getDealerButtonPosition())
+                    .zIndex(3)
+            }
+            
             // Bet amount in separate layer
             if let bet = betAmount, bet > 0 {
                 ChipView(amount: bet)
@@ -619,22 +706,68 @@ struct PlayerSeatView: View {
     }
 }
 
-// Update ChipView to match mockup style
+// Dealer button view
+struct DealerButtonView: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.white.opacity(0.9),
+                        Color.gray.opacity(0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .frame(width: 24, height: 24)
+                .shadow(color: .black.opacity(0.4), radius: 1)
+            
+            Text("D")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.black)
+        }
+    }
+}
+
+// Update ChipView for better aesthetics
 struct ChipView: View {
     let amount: Double
     
     var body: some View {
         ZStack {
+            // Shadow
+            Circle()
+                .fill(Color.black.opacity(0.2))
+                .frame(width: 52, height: 52)
+                .offset(y: 2)
+            
+            // Base chip
             Circle()
                 .fill(Color.white)
                 .frame(width: 50, height: 50)
-                .shadow(color: .black.opacity(0.3), radius: 2)
+            
+            // Colored chip center
             Circle()
-                .fill(Color.green.opacity(0.9))
+                .fill(LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 20/255, green: 150/255, blue: 20/255),
+                        Color(red: 10/255, green: 80/255, blue: 10/255)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
                 .frame(width: 46, height: 46)
+            
+            // Inner ring
+            Circle()
+                .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                .frame(width: 40, height: 40)
+            
+            // Amount text
             Text("$\(Int(amount))")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.5), radius: 1)
         }
     }
 }
