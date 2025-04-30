@@ -450,12 +450,30 @@ struct ProfileScreen: View {
                 
                 VStack(spacing: 0) {
                     // STACK logo at the top
-                    Text("STACK")
-                        .font(.system(size: 48, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
-                        .padding(.top, 32)
-                        .padding(.bottom, 0)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    HStack {
+                        Spacer()
+                        Text("STACK")
+                            .font(.system(size: 48, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                        Spacer()
+                        
+                        // Add sign out button to top right
+                        Button(action: signOut) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 18))
+                                .foregroundColor(.gray)
+                                .padding(8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 0.7)))
+                                )
+                        }
+                        .padding(.trailing, 16)
+                    }
+                    .padding(.top, 32)
+                    .padding(.bottom, 0)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    
                     Spacer(minLength: 0)
                     if let profile = userService.currentUserProfile {
                         VStack(spacing: 18) {
@@ -570,23 +588,6 @@ struct ProfileScreen: View {
                         }
                     }
                     Spacer()
-                    Button(action: signOut) {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                            Text("Sign Out")
-                        }
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(Color.red.opacity(0.85))
-                        )
-                        .padding(.horizontal, 32)
-                        .padding(.bottom, 36)
-                        .shadow(color: .red.opacity(0.18), radius: 8, y: 2)
-                    }
                 }
             }
             .sheet(isPresented: $showEdit) {

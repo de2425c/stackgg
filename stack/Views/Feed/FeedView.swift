@@ -8,6 +8,7 @@ struct FeedView: View {
     @EnvironmentObject var userService: UserService
     @State private var showingNewPost = false
     @State private var isRefreshing = false
+    @State private var showingDiscoverUsers = false
     let userId: String
     
     var body: some View {
@@ -55,23 +56,65 @@ struct FeedView: View {
                             }
                         }
                         
-                        LazyVStack(spacing: 1) {
-                            ForEach(postService.posts) { post in
-                                PostRow(post: post)
-                                    .onAppear {
-                                        if post.id == postService.posts.last?.id {
-                                            Task {
-                                                try? await postService.fetchMorePosts()
+                        if postService.posts.isEmpty && !postService.isLoading {
+                            VStack(spacing: 24) {
+                                Spacer()
+                                    .frame(height: 40)
+                                
+                                Image(systemName: "person.3.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.8)))
+                                
+                                Text("Your feed is empty")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Create your first post or follow other players to see their content here.")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                
+                                // Update button text to be more generic
+                                Button(action: {
+                                    if let profile = userService.currentUserProfile {
+                                        navigateToFollowSuggestions()
+                                    }
+                                }) {
+                                    Text("Discover Players")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.black)
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 20)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                                        )
+                                }
+                                
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                        } else {
+                            LazyVStack(spacing: 1) {
+                                ForEach(postService.posts) { post in
+                                    PostRow(post: post)
+                                        .onAppear {
+                                            if post.id == postService.posts.last?.id {
+                                                Task {
+                                                    try? await postService.fetchMorePosts()
+                                                }
                                             }
                                         }
-                                    }
-                            }
-                            
-                            if postService.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 24)
+                                }
+                                
+                                if postService.isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 24)
+                                }
                             }
                         }
                         
@@ -100,7 +143,19 @@ struct FeedView: View {
                     .environmentObject(userService)
             }
         }
+        .sheet(isPresented: $showingDiscoverUsers, onDismiss: {
+            // Refresh posts when returning from Discover Users view
+            Task {
+                try? await postService.fetchPosts()
+            }
+        }) {
+            DiscoverUsersView(userId: userId)
+        }
         .environmentObject(postService)
+    }
+    
+    private func navigateToFollowSuggestions() {
+        showingDiscoverUsers = true
     }
 }
 
