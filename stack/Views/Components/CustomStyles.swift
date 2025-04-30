@@ -4,9 +4,9 @@ struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .foregroundColor(.black)
-            .frame(height: 56)
+            .foregroundColor(.white)
+            .background(Color.clear)
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
     }
 } 

@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseFirestore
 
 struct DashboardView: View {
+    @EnvironmentObject var userService: UserService
     @StateObject private var handStore: HandStore
     @StateObject private var sessionStore: SessionStore
     @State private var selectedTab = 0
@@ -15,13 +16,13 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background
-                Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-                    .ignoresSafeArea()
+                // Apply new background view
+                AppBackgroundView()
                 
                 VStack(spacing: 0) {
                     // Top Tab Bar
                     HStack(spacing: 24) {
+                        Spacer()
                         ForEach(0..<tabs.count, id: \.self) { index in
                             TabButton(
                                 title: tabs[index],
@@ -31,11 +32,13 @@ struct DashboardView: View {
                                     selectedTab = index
                                 }
                             }
+                            .frame(minWidth: 60)
                         }
                         Spacer()
                     }
-                    .padding(.horizontal)
                     .padding(.top, 8)
+                    .padding(.horizontal)
+                    .background(Color.clear)
                     
                     // Content
                     TabView(selection: $selectedTab) {
@@ -49,14 +52,26 @@ struct DashboardView: View {
                             .tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    .background(Color.clear)
                 }
+                .background(Color.clear)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Image(systemName: "chart.line.uptrend.xyaxis") // or your app icon
-                        .foregroundColor(.white)
-                        .font(.system(size: 24))
+                    // Use Profile Image instead of default icon
+                    if let profile = userService.currentUserProfile, let urlString = profile.avatarURL, let url = URL(string: urlString) {
+                        ProfileImageView(url: url)
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                            .id(urlString) // Ensure refresh on URL change
+                    } else {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 36, height: 36)
+                            .foregroundColor(.gray)
+                    }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -65,7 +80,11 @@ struct DashboardView: View {
                         .font(.system(size: 20))
                 }
             }
+            // Hide the default navigation bar background
+            .toolbarBackground(.hidden, for: .navigationBar)
         }
+        .navigationViewStyle(StackNavigationViewStyle())
+        .background(Color.clear)
     }
 }
 
@@ -245,7 +264,7 @@ struct AnalyticsCard: View {
             }
         }
         .padding()
-        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+        .background(Color.clear)
         .cornerRadius(16)
         .shadow(color: highlightColor.opacity(0.15), radius: 8, y: 2)
         .fullScreenCover(isPresented: $showingReplay) {
@@ -262,7 +281,7 @@ struct HandsTab: View {
             LazyVStack(spacing: 12) {
                 ForEach(handStore.savedHands) { savedHand in
                     HandSummaryRow(hand: savedHand.hand)
-                        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                        .background(Color.clear)
                         .cornerRadius(12)
                 }
             }
@@ -279,16 +298,14 @@ struct SessionsTab: View {
     }
     
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(sessionStore.sessions) { session in
-                    SessionSummaryRow(session: session)
-                        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                        .cornerRadius(12)
+        // Use the new SessionCalendarView
+        SessionCalendarView(sessionStore: sessionStore)
+            .onAppear {
+                // Fetch sessions when the view appears if not already loaded
+                if sessionStore.sessions.isEmpty {
+                    sessionStore.fetchSessions()
                 }
             }
-            .padding()
-        }
     }
 }
 

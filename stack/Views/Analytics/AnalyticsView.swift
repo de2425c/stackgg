@@ -62,21 +62,10 @@ struct AnalyticsView: View {
             VStack(spacing: 24) {
                 // Profit Graph Section
                 VStack(spacing: 16) {
-                    HStack {
-                        Text("Total Profit")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
-                        Spacer()
-                        Text(totalProfit >= 0 ? "+$\(Int(totalProfit))" : "-$\(abs(Int(totalProfit)))")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(totalProfit >= 0 ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : .red)
-                    }
-                    .padding(.horizontal)
-                    
                     ProfitGraph(sessionStore: sessionStore)
                 }
-                .padding(.vertical, 16)
-                .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                .padding(.vertical, 0)
+                .background(Color.clear)
                 .cornerRadius(16)
                 .padding(.horizontal)
                 
@@ -107,18 +96,19 @@ struct AnalyticsView: View {
                                 Spacer()
                             }
                             .padding()
-                            .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                            .background(Color.clear)
                             .cornerRadius(12)
                         }
                     }
                     .padding(.horizontal)
                 }
             }
-            .padding(.vertical)
+            // Add back a smaller top padding
+            .padding(.top, 12)
         }
-        .background(Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0)))
         .onAppear {
             sessionStore.fetchSessions()
         }
+        .background(Color.clear)
     }
 } 
