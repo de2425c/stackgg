@@ -35,7 +35,7 @@ struct HomePage: View {
                 DashboardView(userId: userId)
                     .tag(Tab.dashboard)
                 
-                FeedView()
+                FeedView(userId: userId)
                     .tag(Tab.feed)
                 
                 Color.clear // Placeholder for Add tab
@@ -412,65 +412,66 @@ struct ProfileScreen: View {
                                 }
                             }
                             .padding(.bottom, 8)
-                            Text(profile.username)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            if let bio = profile.bio, !bio.isEmpty {
-                                Text(bio)
-                                    .font(.system(size: 16, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.85))
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 24)
+                            
+                            VStack(spacing: 6) {
+                                if let displayName = profile.displayName, !displayName.isEmpty {
+                                    Text(displayName)
+                                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Text("@\(profile.username)")
+                                    .font(.system(size: displayNameVisible(profile) ? 18 : 28, weight: displayNameVisible(profile) ? .medium : .bold, design: .rounded))
+                                    .foregroundColor(.gray)
+                                    
+                                if let bio = profile.bio, !bio.isEmpty {
+                                    Text(bio)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white.opacity(0.85))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 24)
+                                        .padding(.top, 12)
+                                }
                             }
                             
-                            // Social Stats
                             HStack(spacing: 32) {
                                 NavigationLink(destination: FollowListView(userId: userId, listType: .followers)) {
-                                    VStack(spacing: 4) {
+                                    VStack(spacing: 8) {
                                         Text("\(profile.followersCount)")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 24, weight: .bold))
                                             .foregroundColor(.white)
                                         Text("Followers")
                                             .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .foregroundColor(.gray)
                                     }
                                 }
                                 
                                 NavigationLink(destination: FollowListView(userId: userId, listType: .following)) {
-                                    VStack(spacing: 4) {
+                                    VStack(spacing: 8) {
                                         Text("\(profile.followingCount)")
-                                            .font(.system(size: 20, weight: .bold))
+                                            .font(.system(size: 24, weight: .bold))
                                             .foregroundColor(.white)
                                         Text("Following")
                                             .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .foregroundColor(.gray)
                                     }
                                 }
                             }
-                            .padding(.vertical, 8)
+                            .padding(.top, 12)
                             
-                            HStack(spacing: 16) {
-                                if let location = profile.location, !location.isEmpty {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "mappin.and.ellipse")
-                                            .foregroundColor(Color.green)
-                                        Text(location)
-                                            .foregroundColor(.white.opacity(0.7))
-                                            .font(.system(size: 15, weight: .medium))
-                                    }
-                                }
-                                if let game = profile.favoriteGame, !game.isEmpty {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "suit.club.fill")
-                                            .foregroundColor(Color.green)
-                                        Text(game)
-                                            .foregroundColor(.white.opacity(0.7))
-                                            .font(.system(size: 15, weight: .medium))
-                                    }
-                                }
+                            if let game = profile.favoriteGame {
+                                Text("Favorite Game: \(game)")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
+                                    )
                             }
-                            .padding(.top, 2)
-                            .padding(.bottom, 8)
+                            
+                            // Edit Profile button
                             Button(action: { showEdit = true }) {
                                 HStack {
                                     Image(systemName: "pencil")
@@ -537,6 +538,12 @@ struct ProfileScreen: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
+    
+    // Helper function to check if display name is visible
+    private func displayNameVisible(_ profile: UserProfile) -> Bool {
+        return profile.displayName != nil && !profile.displayName!.isEmpty
+    }
+    
     private func signOut() {
         do {
             try Auth.auth().signOut()
@@ -562,9 +569,28 @@ struct ProfileEditView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Username")) {
+                Section(header: Text("Profile Information")) {
+                    TextField("Display Name", text: Binding(
+                        get: { profile.displayName ?? "" },
+                        set: { profile.displayName = $0.isEmpty ? nil : $0 }
+                    ))
+                    .font(.system(size: 16))
+                    
                     TextField("Username", text: $profile.username)
+                        .font(.system(size: 16))
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
                 }
+                
+                Section(header: Text("Bio")) {
+                    TextEditor(text: Binding(
+                        get: { profile.bio ?? "" },
+                        set: { profile.bio = $0.isEmpty ? nil : $0 }
+                    ))
+                    .font(.system(size: 16))
+                    .frame(height: 80)
+                }
+                
                 Section(header: Text("Profile Picture")) {
                     HStack {
                         if let selectedImage = selectedImage {
@@ -580,43 +606,36 @@ struct ProfileEditView: View {
                             Circle().fill(Color.gray).frame(width: 80, height: 80)
                         }
                         Spacer()
-                        PhotosPicker(selection: $imagePickerItem, matching: .images, photoLibrary: .shared()) {
-                            Text("Select Photo")
+                        
+                        PhotosPicker(selection: $imagePickerItem, matching: .images) {
+                            Text("Select Image")
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                                .cornerRadius(8)
                         }
                         .onChange(of: imagePickerItem) { newItem in
-                            if let newItem = newItem {
-                                Task {
-                                    if let data = try? await newItem.loadTransferable(type: Data.self),
-                                       let uiImage = UIImage(data: data) {
-                                        DispatchQueue.main.async {
-                                            selectedImage = uiImage
-                                        }
+                            guard let item = newItem else { return }
+                            Task {
+                                if let data = try? await item.loadTransferable(type: Data.self),
+                                   let image = UIImage(data: data) {
+                                    DispatchQueue.main.async {
+                                        selectedImage = image
                                     }
                                 }
                             }
                         }
                     }
                 }
-                Section(header: Text("Location")) {
-                    TextField("Location", text: Binding(
-                        get: { profile.location ?? "" },
-                        set: { profile.location = $0.isEmpty ? nil : $0 }
-                    ))
-                }
-                Section(header: Text("Bio")) {
-                    TextEditor(text: Binding(
-                        get: { profile.bio ?? "" },
-                        set: { profile.bio = $0.isEmpty ? nil : $0 }
-                    ))
-                        .frame(height: 80)
-                }
+                
                 Section(header: Text("Favorite Game")) {
-                    Picker("Favorite Game", selection: Binding(
+                    Picker("Game", selection: Binding(
                         get: { profile.favoriteGame ?? "NLH" },
                         set: { profile.favoriteGame = $0 }
                     )) {
                         ForEach(gameOptions, id: \.self) { game in
-                            Text(game)
+                            Text(game).tag(game)
                         }
                     }
                     .pickerStyle(SegmentedPickerStyle())
