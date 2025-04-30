@@ -13,8 +13,8 @@ struct FeedView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Using solid background color - extend it fully to avoid any transparency issues
-                Color.black
+                // Using solid background color - extend it fully
+                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -36,7 +36,9 @@ struct FeedView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 18)
-                    .background(Color.black)
+                    .background(
+                        Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.98))
+                    )
                     .overlay(
                         Rectangle()
                             .frame(height: 0.5)
@@ -45,42 +47,42 @@ struct FeedView: View {
                         alignment: .bottom
                     )
                     
-                    ScrollView {
-                        RefreshControl(isRefreshing: $isRefreshing) {
-                            Task {
-                                try? await postService.fetchPosts()
-                                isRefreshing = false
+                    // Wrap the ScrollView in a GeometryReader to handle bottom spacing properly
+                    GeometryReader { geometry in
+                        ScrollView {
+                            RefreshControl(isRefreshing: $isRefreshing) {
+                                Task {
+                                    try? await postService.fetchPosts()
+                                    isRefreshing = false
+                                }
                             }
-                        }
-                        
-                        LazyVStack(spacing: 1) {
-                            ForEach(postService.posts) { post in
-                                PostRow(post: post)
-                                    .onAppear {
-                                        if post.id == postService.posts.last?.id {
-                                            Task {
-                                                try? await postService.fetchMorePosts()
+                            
+                            LazyVStack(spacing: 1) {
+                                ForEach(postService.posts) { post in
+                                    PostRow(post: post)
+                                        .onAppear {
+                                            if post.id == postService.posts.last?.id {
+                                                Task {
+                                                    try? await postService.fetchMorePosts()
+                                                }
                                             }
                                         }
-                                    }
+                                }
+                                
+                                if postService.isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 24)
+                                }
+                                
+                                // Create space at the bottom to ensure content doesn't get hidden by tab bar
                             }
-                            
-                            if postService.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 24)
-                            }
-                            
-                            // Add explicit bottom padding to ensure space for the tab bar
-                            Color.black
-                                .frame(height: 100) // Ensure this is taller than the tab bar
-                                .frame(maxWidth: .infinity)
                         }
                     }
-                    .background(Color.black)
                 }
-                .background(Color.black)
+                .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
+                .edgesIgnoringSafeArea(.bottom) // This ensures content respects the safe area but background extends
             }
             .navigationBarHidden(true)
         }
@@ -247,12 +249,12 @@ struct PostRow: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .background(Color.black) // Fully opaque background
+        .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.7))) // Semi-transparent background
         // Clear separator between posts
         .overlay(
             Rectangle()
                 .frame(height: 6)
-                .foregroundColor(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))) // Fully opaque separator
+                .foregroundColor(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 0.7))) // Semi-transparent separator
                 .padding(.horizontal, 0),
             alignment: .bottom
         )
