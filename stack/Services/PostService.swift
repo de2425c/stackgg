@@ -19,10 +19,50 @@ class PostService: ObservableObject {
     
     init() {
         setupAutoRefresh()
+        
+        // Add an observer to handle sign out cleanup
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(cleanupOnSignOut),
+            name: NSNotification.Name("UserWillSignOut"),
+            object: nil
+        )
     }
     
     deinit {
-        cancelAutoRefresh()
+        NotificationCenter.default.removeObserver(self)
+        // In case notification-based cleanup didn't happen, we need to use a nonisolated method
+        if autoRefreshCancellable != nil {
+            performNonisolatedCleanup()
+        }
+    }
+    
+    // Safely cleanup resources when called from within the actor
+    @objc private func cleanupOnSignOut() {
+        cleanupResources()
+    }
+    
+    // Safe cleanup method for use within the actor context
+    private func cleanupResources() {
+        autoRefreshCancellable?.cancel()
+        autoRefreshCancellable = nil
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        posts = []
+        followingUserIds = []
+    }
+    
+    // This method is explicitly nonisolated so it can be called from deinit
+    private nonisolated func performNonisolatedCleanup() {
+        // Since we're in a nonisolated context, we need to use Task to get back to the MainActor
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            self.autoRefreshCancellable?.cancel()
+            self.autoRefreshCancellable = nil
+            self.refreshTimer?.invalidate()
+            self.refreshTimer = nil
+            // Don't reset published properties as the object is being deallocated anyway
+        }
     }
     
     private func setupAutoRefresh() {
@@ -34,19 +74,6 @@ class PostService: ObservableObject {
                     try? await self?.fetchPosts()
                 }
             }
-    }
-    
-    private func cancelAutoRefresh() {
-        // Run on main thread to safely cancel the publisher
-        if Thread.isMainThread {
-            autoRefreshCancellable?.cancel()
-            autoRefreshCancellable = nil
-        } else {
-            Task { @MainActor in
-                autoRefreshCancellable?.cancel()
-                autoRefreshCancellable = nil
-            }
-        }
     }
     
     private func fetchFollowingUsers() async throws -> [String] {

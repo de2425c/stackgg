@@ -71,6 +71,9 @@ class AuthService: ObservableObject {
     
     func signOut() throws {
         do {
+            // Post notification to allow services to clean up before sign out
+            NotificationCenter.default.post(name: NSNotification.Name("UserWillSignOut"), object: nil)
+            
             try Auth.auth().signOut()
             DispatchQueue.main.async {
                 self.user = nil

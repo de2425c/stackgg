@@ -290,107 +290,243 @@ struct PressableButtonStyle: ButtonStyle {
     }
 }
 
-struct HandInputView: View {
+// Break out the title view
+struct HandTitleView: View {
+    var body: some View {
+        Text("Add Poker Hand")
+            .font(.system(size: 28, weight: .bold, design: .rounded))
+            .foregroundColor(.white)
+            .padding(.top, 12)
+    }
+}
+
+// Break out the text editor
+struct HandTextEditorView: View {
+    @Binding var text: String
+    @FocusState.Binding var isFocused: Bool
+    
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: $text)
+                .focused($isFocused)
+                .foregroundColor(.white)
+                .font(.system(size: 15, design: .monospaced))
+                .scrollContentBackground(.hidden)
+                .padding(16)
+                .frame(minHeight: 180, maxHeight: 220)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(red: 0.1, green: 0.1, blue: 0.14))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            isFocused ? 
+                                Color(red: 123/255, green: 255/255, blue: 99/255) : 
+                                Color(white: 0.3), 
+                            lineWidth: isFocused ? 2 : 1
+                        )
+                )
+            
+            if text.isEmpty && !isFocused {
+                Text("Paste your hand history here...")
+                    .foregroundColor(Color.gray)
+                    .font(.system(size: 15, design: .default))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isFocused)
+    }
+}
+
+// Break out the button
+struct ParseButtonView: View {
+    var isLoading: Bool
+    var isEmpty: Bool
+    var action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "play.card")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                
+                Text(isLoading ? "Parsing..." : "Parse Hand")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 123/255, green: 255/255, blue: 99/255),
+                        Color(red: 100/255, green: 230/255, blue: 85/255)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .opacity(isEmpty || isLoading ? 0.6 : 1)
+            )
+            .foregroundColor(.black)
+            .cornerRadius(16)
+            .shadow(color: Color(red: 123/255, green: 255/255, blue: 99/255), radius: 8, y: 2)
+        }
+        .disabled(isEmpty || isLoading)
+        .padding(.vertical, 4)
+    }
+}
+
+// Break out success view
+struct ParseSuccessView: View {
+    let parsedHand: ParsedHandHistory
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Successfully Parsed!")
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    // Display small blind and big blind as stakes
+                    Text("Stakes: $\(parsedHand.raw.gameInfo.smallBlind)/$\(parsedHand.raw.gameInfo.bigBlind)")
+                        .foregroundColor(.white)
+                    
+                    // Show total pot amount
+                    Text("Pot: $\(String(format: "%.2f", parsedHand.raw.pot.amount))")
+                        .foregroundColor(.white)
+                    
+                    // Display number of players
+                    Text("Players: \(parsedHand.raw.players.count)")
+                        .foregroundColor(.white)
+                    
+                    // Display hero's seat if available
+                    if let hero = parsedHand.raw.players.first(where: { $0.isHero }) {
+                        Text("Your Position: Seat \(hero.seat)")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 14))
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(red: 0.12, green: 0.12, blue: 0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(red: 123/255, green: 255/255, blue: 99/255), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .transition(.opacity)
+    }
+}
+
+// Simplified AddHandView that uses the components
+struct AddHandView: View {
+    let userId: String
+    var onDismiss: () -> Void
     @Environment(\.dismiss) var dismiss
-    @StateObject private var handStore: HandStore
+    @StateObject private var handStore = HandStore(userId: "")
     @State private var handText = ""
     @State private var isLoading = false
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var parsedHand: ParsedHandHistory?
     @State private var showingSuccess = false
-    
-    init(userId: String) {
+    @FocusState private var isFocused: Bool
+
+    init(userId: String, onDismiss: @escaping () -> Void) {
+        self.userId = userId
+        self.onDismiss = onDismiss
         _handStore = StateObject(wrappedValue: HandStore(userId: userId))
     }
-    
+
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-                    .ignoresSafeArea()
+        ZStack {
+            AppBackgroundView()
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                HandTitleView()
                 
-                VStack(spacing: 20) {
-                    TextEditor(text: $handText)
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
+                VStack(spacing: 16) {
+                    HandTextEditorView(text: $handText, isFocused: $isFocused)
                     
-                    Button(action: parseHand) {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
-                        } else {
-                            Text("Parse Hand")
-                                .font(.system(size: 17, weight: .semibold))
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
-                            .opacity(handText.isEmpty || isLoading ? 0.5 : 1)
+                    ParseButtonView(
+                        isLoading: isLoading,
+                        isEmpty: handText.isEmpty,
+                        action: parseHand
                     )
-                    .foregroundColor(.black)
-                    .cornerRadius(12)
-                    .disabled(handText.isEmpty || isLoading)
-                    
-                    if let parsedHand = parsedHand {
-                        ScrollView {
-                            Text(String(describing: parsedHand))
-                                .foregroundColor(.black)
-                                .font(.system(.body, design: .monospaced))
-                                .padding()
-                        }
-                        .background(Color.black.opacity(0.3))
-                        .cornerRadius(12)
-                    }
-                    
-                    Spacer()
                 }
-                .padding(24)
-            }
-            .navigationTitle("Add Hand")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.white)
-                    }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color(red: 0.12, green: 0.12, blue: 0.1))
+                        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 10)
+                )
+                .padding(.horizontal, 16)
+                
+                if let parsedHand = parsedHand {
+                    ParseSuccessView(parsedHand: parsedHand)
                 }
+                
+                Spacer()
+                
+                // Close button
+                Button(action: { onDismiss(); dismiss() }) {
+                    Circle()
+                        .fill(Color(red: 0.15, green: 0.15, blue: 0.18))
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Image(systemName: "xmark")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 8)
+                }
+                .padding(.bottom, 16)
             }
+            .padding(.top, 10)
         }
         .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
+            Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
         }
     }
-    
+
     private func parseHand() {
         isLoading = true
-        
         Task {
             do {
                 let parsed = try await HandParserService.shared.parseHand(description: handText)
                 self.parsedHand = parsed
-                
-                // Save the hand to Firebase
                 try await handStore.saveHand(parsed)
                 
                 DispatchQueue.main.async {
                     showingSuccess = true
-                    // Dismiss the view after successful save
-                    dismiss()
+                    withAnimation {
+                        self.showingSuccess = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        onDismiss()
+                        dismiss()
+                    }
                 }
             } catch let error as HandParserError {
                 errorMessage = error.message
@@ -836,138 +972,7 @@ struct AddMenuOverlay: View {
         }
         .transition(.opacity)
         .sheet(isPresented: $showHandInput) {
-            HandInputViewSleek(userId: userId) {
-                showHandInput = false
-                showingMenu = false
-            }
-        }
-    }
-}
-
-// Sleek, modern HandInputView
-struct HandInputViewSleek: View {
-    let userId: String
-    var onDismiss: () -> Void
-    @Environment(\.dismiss) var dismiss
-    @StateObject private var handStore = HandStore(userId: "")
-    @State private var handText = ""
-    @State private var isLoading = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var parsedHand: ParsedHandHistory?
-    @State private var showingSuccess = false
-    @FocusState private var isFocused: Bool
-
-    init(userId: String, onDismiss: @escaping () -> Void) {
-        self.userId = userId
-        self.onDismiss = onDismiss
-        _handStore = StateObject(wrappedValue: HandStore(userId: userId))
-    }
-
-    var body: some View {
-        ZStack {
-            // Change background to clear
-            Color.clear.ignoresSafeArea()
-            VStack(spacing: 24) {
-                Text("Add Poker Hand")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(white: 0.92))
-                    .padding(.top, 12)
-                VStack(spacing: 0) {
-                    TextEditor(text: $handText)
-                        .focused($isFocused)
-                        .foregroundColor(Color(white: 0.85))
-                        .font(.system(size: 16, design: .monospaced))
-                        .frame(minHeight: 140, maxHeight: 180)
-                        .padding(14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                // Change background to clear
-                                .fill(Color.clear)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(isFocused ? Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.9)) : Color.clear, lineWidth: 1.5)
-                        )
-                        .animation(.easeInOut(duration: 0.2), value: isFocused)
-                        .padding(.bottom, 10)
-                    Button(action: parseHand) {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))))
-                        } else {
-                            Text("Parse Hand")
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundColor(.black)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: handText.isEmpty || isLoading ? 0.5 : 1))
-                    )
-                    .cornerRadius(12)
-                    .shadow(color: Color.green.opacity(0.10), radius: 6, y: 1)
-                    .disabled(handText.isEmpty || isLoading)
-                }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        // Change background to clear
-                        .fill(Color.clear)
-                )
-                .padding(.horizontal, 8)
-                if let parsedHand = parsedHand {
-                    ScrollView {
-                        Text(String(describing: parsedHand))
-                            .foregroundColor(Color(white: 0.85))
-                            .font(.system(.body, design: .monospaced))
-                            .padding()
-                    }
-                    // Change background to clear
-                    .background(Color.clear)
-                    .cornerRadius(10)
-                    .padding(.horizontal, 8)
-                }
-                Spacer()
-                Button(action: { onDismiss(); dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundColor(Color(white: 0.85))
-                        .shadow(radius: 6)
-                }
-                .padding(.bottom, 14)
-            }
-            .padding(.top, 8)
-            .padding(.horizontal, 14)
-        }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-
-    private func parseHand() {
-        isLoading = true
-        Task {
-            do {
-                let parsed = try await HandParserService.shared.parseHand(description: handText)
-                self.parsedHand = parsed
-                try await handStore.saveHand(parsed)
-                DispatchQueue.main.async {
-                    showingSuccess = true
-                    onDismiss()
-                    dismiss()
-                }
-            } catch let error as HandParserError {
-                errorMessage = error.message
-                showingError = true
-            } catch {
-                errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
-                showingError = true
-            }
-            isLoading = false
+            AddHandView(userId: userId, onDismiss: { showHandInput = false; showingMenu = false })
         }
     }
 } 
