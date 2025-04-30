@@ -9,7 +9,7 @@ struct PostView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Profile image
+            AppBackgroundView()
             Group {
                 if let profileImage = post.profileImage {
                     AsyncImage(url: URL(string: profileImage)) { image in

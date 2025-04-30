@@ -12,20 +12,31 @@ struct FeedView: View {
     
     var body: some View {
         NavigationView {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
+                // Using solid background color - extend it fully to avoid any transparency issues
+                Color.black
+                    .ignoresSafeArea()
+                
                 VStack(spacing: 0) {
                     // Modern header with gradient - more Twitter-like
                     HStack {
-                        Text("STACK")
+                        Text("FEED")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
+                        
                         Spacer()
+                        
+                        // Add post button in the top right
+                        Button(action: { showingNewPost = true }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                                .frame(width: 44, height: 44)
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 18)
-                    .background(
-                        Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.98))
-                    )
+                    .background(Color.black)
                     .overlay(
                         Rectangle()
                             .frame(height: 0.5)
@@ -60,48 +71,30 @@ struct FeedView: View {
                                     .frame(maxWidth: .infinity, alignment: .center)
                                     .padding(.vertical, 24)
                             }
+                            
+                            // Add explicit bottom padding to ensure space for the tab bar
+                            Color.black
+                                .frame(height: 100) // Ensure this is taller than the tab bar
+                                .frame(maxWidth: .infinity)
                         }
                     }
+                    .background(Color.black)
                 }
-                .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
-                
-                // Modern floating action button with gradient
-                Button(action: { showingNewPost = true }) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)),
-                                        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.8))
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 58, height: 58)
-                            .shadow(color: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.3)), radius: 10, y: 5)
-                        
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .padding(.trailing, 24)
-                .padding(.bottom, 24)
+                .background(Color.black)
             }
             .navigationBarHidden(true)
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
+        .onAppear {
+            Task {
+                try? await postService.fetchPosts()
+            }
         }
         .sheet(isPresented: $showingNewPost) {
             if let profile = userService.currentUserProfile {
                 NewPostView(userId: userId, userProfile: profile, postService: postService)
                     .environmentObject(postService)
                     .environmentObject(userService)
-            }
-        }
-        .onAppear {
-            Task {
-                try? await postService.fetchPosts()
             }
         }
         .environmentObject(postService)
@@ -254,12 +247,12 @@ struct PostRow: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 1.0)))
+        .background(Color.black) // Fully opaque background
         // Clear separator between posts
         .overlay(
             Rectangle()
                 .frame(height: 6)
-                .foregroundColor(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
+                .foregroundColor(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))) // Fully opaque separator
                 .padding(.horizontal, 0),
             alignment: .bottom
         )
@@ -319,7 +312,9 @@ struct NewPostView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)).ignoresSafeArea()
+                // Use solid background color instead of AppBackgroundView
+                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Header
@@ -453,7 +448,7 @@ struct NewPostView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
-                    .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.95)))
+                    .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.8))) // Semi-transparent
                 }
             }
             .navigationTitle("New Post")

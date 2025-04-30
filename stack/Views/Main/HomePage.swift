@@ -38,7 +38,7 @@ struct HomePage: View {
                 FeedView(userId: userId)
                     .tag(Tab.feed)
                 
-                Color.clear // Placeholder for Add tab
+                Color.clear 
                     .tag(Tab.add)
                 
                 GroupsView()
@@ -87,8 +87,13 @@ struct CustomTabBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Background - Change to clear
-            Color.clear
+            // Top divider line
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 0.5)
+            
+            // Completely solid black background
+            Color.black
                 .frame(height: 65)
                 .overlay(
                     VStack(spacing: 0) {
@@ -130,6 +135,7 @@ struct CustomTabBar: View {
                     }
                 )
         }
+        .background(Color.black) // Ensure the entire background is solid black
         .frame(height: 78)
         .frame(maxWidth: .infinity)
     }
@@ -359,13 +365,32 @@ struct HandInputView: View {
 struct GroupsView: View {
     var body: some View {
         ZStack {
-            // Remove background
-            // Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
-            //     .ignoresSafeArea()
+            // Add proper background color
+            Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
+                .ignoresSafeArea()
             
-            Text("Groups Coming Soon")
-                .foregroundColor(.white)
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    Text("GROUPS")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
+                .padding(.bottom, 24)
+                
+                Spacer()
+                
+                Text("Groups Coming Soon")
+                    .foregroundColor(.white)
+                    .font(.system(size: 18, weight: .medium))
+                
+                Spacer()
+            }
         }
+        .navigationBarHidden(true)
     }
 }
 
@@ -686,14 +711,37 @@ struct AddMenuOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.clear
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
-            Color.black.opacity(0.35)
+            // Background that excludes the tab bar central button
+            ZStack {
+                // Full screen material blur
+                Color.black.opacity(0.5)
+                    .background(.thinMaterial)
+                    .ignoresSafeArea()
+                
+                // Cutout for the + button - positioned at center bottom
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(Color.black.opacity(0.01)) // Nearly transparent
+                            .blendMode(.destinationOut) // This creates the "hole" effect
+                            .frame(width: 70, height: 70)
+                        Spacer()
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .compositingGroup() // Ensures the blendMode works properly
+            
+            // Dim overlay to darken screen outside the menu
+            Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
                     withAnimation { showingMenu = false }
                 }
+            
+            // Actual menu content
             GeometryReader { geo in
                 VStack {
                     Spacer()
@@ -718,20 +766,32 @@ struct AddMenuOverlay: View {
                             title: "Add Hand",
                             action: { showHandInput = true }
                         )
-                        Button(action: { withAnimation { showingMenu = false } }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundColor(.white.opacity(0.85))
-                                .shadow(radius: 8)
-                        }
-                        .padding(.top, 8)
-                        .padding(.bottom, geo.size.height * 0.12)
+                        
+                        // Spacer to push content up
+                        Spacer()
+                            .frame(height: geo.size.height * 0.15)
                     }
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            
+            // Invisible button directly over the + button to handle taps
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        withAnimation { showingMenu = false }
+                    }) {
+                        Color.clear
+                            .frame(width: 70, height: 70)
+                    }
+                    Spacer()
+                }
+                .padding(.bottom, 20)
+            }
         }
+        .transition(.opacity)
         .sheet(isPresented: $showHandInput) {
             HandInputViewSleek(userId: userId) {
                 showHandInput = false

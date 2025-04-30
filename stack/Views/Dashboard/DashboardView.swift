@@ -8,7 +8,6 @@ struct DashboardView: View {
     @State private var selectedTab = 0
     private let tabs = ["Analytics", "Hands", "Sessions"]
     @StateObject private var postService = PostService()
-    @EnvironmentObject var userService: UserService
     @State private var showingReplay = false
     @State private var selectedHand: ParsedHandHistory?
     
@@ -231,9 +230,9 @@ struct AnalyticsCard: View {
     
     private var formattedAmount: String {
         if amount >= 0 {
-            return "+$\(abs(Int(amount)))"
+            return "$\(abs(Int(amount)))"
         } else {
-            return "-$\(abs(Int(amount)))"
+            return "$\(abs(Int(amount)))"
         }
     }
 
