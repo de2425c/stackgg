@@ -76,7 +76,7 @@ class AuthViewModel: ObservableObject {
 }
 
 struct MainCoordinator: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
+    @StateObject var authViewModel: AuthViewModel = AuthViewModel()
     
     var body: some View {
         Group {
