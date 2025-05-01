@@ -35,7 +35,6 @@ struct HandReplayView: View {
     @State private var showCheckAnimation: Bool = false
     @State private var showingShareSheet = false
     @State private var showingShareAlert = false
-    @State private var isShowdownComplete = false
     @EnvironmentObject var postService: PostService
     @EnvironmentObject var userService: UserService
     
@@ -111,26 +110,27 @@ struct HandReplayView: View {
                             .position(x: geometry.size.width / 2, y: geometry.size.height * 0.4)
                             .shadow(color: .black.opacity(0.5), radius: 10)
                         
-                        // Stack Logo - positioned above pot
+                        // Stack Logo - moved up
                         Text("STACK")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .opacity(0.3)
-                            .offset(y: -geometry.size.height * 0.12) // Moved up above pot
+                            .offset(y: -geometry.size.height * 0.28)
 
-                        // Pot display - centered at middle of table
+                        // Pot display - centered
                         if potAmount > 0 {
-                            ChipView(amount: potAmount)
-                                .scaleEffect(1.2) // Scale up for better visibility
-                                .transition(.scale.combined(with: .opacity))
-                                .animation(.spring(response: 0.4), value: potAmount)
-                                .offset(y: geometry.size.height * 0.02) // Moved down further
+                            VStack(spacing: 4) {
+                                Text("Pot")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                                ChipView(amount: potAmount)
+                            }
+                            .offset(y: -geometry.size.height * 0.2)
                         }
 
-                        // Community Cards - positioned closer to hero
+                        // Community Cards - centered, a bit below the pot
                         CommunityCardsView(cards: allCommunityCards)
-                            .offset(y: geometry.size.height * 0.10) // Adjusted position
-                            .scaleEffect(1.15) // Make it slightly larger overall
+                            .offset(y: -geometry.size.height * 0.08)
 
                         // Player Seats
                         ForEach(hand.raw.players, id: \.seat) { player in
@@ -146,9 +146,7 @@ struct HandReplayView: View {
                                 isWinner: winningPlayers.contains(player.name),
                                 showPotDistribution: showPotDistribution,
                                 showCheck: showCheckAnimation && lastCheckPlayer == player.name,
-                                isPlayingHand: isPlaying,
-                                isHandComplete: isHandComplete,
-                                isShowdownComplete: isShowdownComplete
+                                isPlayingHand: isPlaying
                             )
                         }
                     }
@@ -225,9 +223,6 @@ struct HandReplayView: View {
         showPotDistribution = false
         lastCheckPlayer = nil
         showCheckAnimation = false
-        isShowdownComplete = false
-        
-        print("DEBUG - startReplay(): All state reset, isShowdownComplete=false")
         
         // Initialize player stacks to their starting values
         initializeStacks()
@@ -342,8 +337,6 @@ struct HandReplayView: View {
     }
     
     private func handleShowdown() {
-        print("DEBUG - handleShowdown() called - Setting isShowdownComplete=true")
-        
         // Reveal cards at showdown
         withAnimation(.easeInOut(duration: 0.5)) {
             showdownRevealed = true
@@ -360,18 +353,16 @@ struct HandReplayView: View {
                     
                     // Update player stacks with winnings
                     for potDist in distribution {
-                        if let currentStack = self.playerStacks[potDist.playerName] {
-                            self.playerStacks[potDist.playerName] = currentStack + potDist.amount
+                        if let currentStack = playerStacks[potDist.playerName] {
+                            playerStacks[potDist.playerName] = currentStack + potDist.amount
                         }
                     }
-                    self.potAmount = 0
+                    potAmount = 0
                 }
             }
         }
         
         isHandComplete = true
-        
-        isShowdownComplete = true
     }
 }
 
@@ -379,120 +370,65 @@ struct CommunityCardsView: View {
     let cards: [String]
 
     var body: some View {
-        VStack(spacing: 4) {
-            // Flop, Turn, River label
-            Text(getStreetLabel())
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.bottom, 2)
-            
-            // All cards in one row
-            HStack(spacing: 5) {
-                ForEach(0..<5) { idx in
-                    if idx < cards.count {
-                        CardView(card: Card(from: cards[idx]))
-                            .frame(width: 38, height: 52)
-                            .shadow(color: .black.opacity(0.6), radius: 1)
-                            .transition(.scale.combined(with: .opacity))
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: cards.count)
-                    } else {
-                        // Empty placeholder
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.clear)
-                            .frame(width: 38, height: 52)
+        HStack {
+            Spacer()
+            VStack(spacing: 6) {
+                // Flop
+                if cards.count >= 3 {
+                    HStack(spacing: 8) {
+                        ForEach(0..<3, id: \.self) { idx in
+                            if idx < cards.count {
+                                CardView(card: Card(from: cards[idx]))
+                                    .frame(width: 32, height: 46)
+                            }
+                        }
+                    }
+                }
+                // Turn and River
+                HStack(spacing: 8) {
+                    if cards.count >= 4 {
+                        CardView(card: Card(from: cards[3]))
+                            .frame(width: 32, height: 46)
+                    }
+                    if cards.count >= 5 {
+                        CardView(card: Card(from: cards[4]))
+                            .frame(width: 32, height: 46)
                     }
                 }
             }
+            Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.1, green: 0.3, blue: 0.1))
-                .shadow(color: .black.opacity(0.5), radius: 2)
-        )
-    }
-    
-    // Get label for current street
-    private func getStreetLabel() -> String {
-        switch cards.count {
-        case 0: return "Pre-Flop"
-        case 3: return "Flop"
-        case 4: return "Turn"
-        case 5: return "River"
-        default: return ""
-        }
+        .frame(maxWidth: .infinity)
     }
 }
 
 struct CardView: View {
     let card: Card
     
-    // Get color based on suit
-    private var cardBackgroundColor: Color {
-        switch card.suit.lowercased() {
-        case "s": return Color(red: 0.1, green: 0.2, blue: 0.5) // Spades - dark blue
-        case "h": return Color(red: 0.5, green: 0.1, blue: 0.1) // Hearts - dark red
-        case "d": return Color(red: 0.1, green: 0.4, blue: 0.6) // Diamonds - medium blue
-        case "c": return Color(red: 0.1, green: 0.3, blue: 0.2) // Clubs - dark green
-        default: return Color(red: 0.1, green: 0.25, blue: 0.5) // Default blue
-        }
-    }
-    
-    private var suitColor: Color {
-        card.suit.lowercased() == "h" || card.suit.lowercased() == "d" ? .red : .white
-    }
-    
     var body: some View {
         ZStack {
-            // Card background - color based on suit
-            RoundedRectangle(cornerRadius: 5)
-                .fill(cardBackgroundColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(Color.black.opacity(0.5), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.2), radius: 1)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white)
+                .shadow(radius: 1)
             
-            // Card content - simplified design matching image
-            VStack {
-                // Top left - rank and suit
-                HStack {
-                    VStack(alignment: .leading, spacing: -2) {
-                        Text(formatRank(card.rank))
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        Text(suitSymbol(for: card.suit))
-                            .font(.system(size: 14))
-                            .foregroundColor(suitColor)
-                    }
-                    .padding(.leading, 4)
-                    .padding(.top, 2)
-                    
-                    Spacer()
-                }
-                
-                Spacer()
+            VStack(spacing: 0) {
+                Text(card.rank)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(card.suit.lowercased() == "h" || card.suit.lowercased() == "d" ? .red : .black)
+                Text(suitSymbol(for: card.suit))
+                    .font(.system(size: 14))
+                    .foregroundColor(card.suit.lowercased() == "h" || card.suit.lowercased() == "d" ? .red : .black)
             }
         }
     }
     
     private func suitSymbol(for suit: String) -> String {
         switch suit.lowercased() {
-        case "h": return "♥"
-        case "d": return "♦"
-        case "c": return "♣"
-        case "s": return "♠"
+        case "h": return "♥️"
+        case "d": return "♦️"
+        case "c": return "♣️"
+        case "s": return "♠️"
         default: return suit
-        }
-    }
-    
-    // Format card ranks for better display
-    private func formatRank(_ rank: String) -> String {
-        switch rank {
-        case "T": return "10"
-        default: return rank
         }
     }
 }
@@ -510,8 +446,6 @@ struct PlayerSeatView: View {
     let showPotDistribution: Bool
     let showCheck: Bool
     let isPlayingHand: Bool
-    let isHandComplete: Bool
-    let isShowdownComplete: Bool
     
     @State private var showCards: Bool = true
     
@@ -575,7 +509,7 @@ struct PlayerSeatView: View {
         let width = geometry.size.width
         let height = geometry.size.height
         let centerX = width * 0.5
-        let centerY = height * 0.4 // Adjusted center of the table
+        let centerY = height * 0.35 // Approximate center of the table
         
         // Get the player's current position
         let pos = getPosition()
@@ -591,26 +525,23 @@ struct PlayerSeatView: View {
         
         // Special positioning for different seat positions
         if isHero {
-            // For hero, place bet to the right side
-            return CGPoint(x: pos.x + 85, y: pos.y)
-        } else if player.position == "small blind" {
-            // For small blind on the left, place bet to the right to avoid overlap
-            return CGPoint(x: pos.x + 65, y: pos.y)
-        } else if player.position == "big blind" {
-            // For big blind, place bet to the right
-            return CGPoint(x: pos.x + 65, y: pos.y + 10)
+            // For hero, place bet further up and to the right to avoid overlap
+            return CGPoint(x: pos.x + 85, y: pos.y - 30)
+        } else if player.position == "small blind" || player.position == "big blind" {
+            // For blinds on the left, place bet closer to the center
+            let betDistance: CGFloat = 50
+            return CGPoint(x: pos.x + (betDistance * 0.7), y: pos.y - (betDistance * 0.3))
         } else if player.position == "cutoff" {
-            // For cutoff on the right, place bet to the left
-            return CGPoint(x: pos.x - 65, y: pos.y)
-        } else if ["hijack", "lojack"].contains(player.position) {
-            // Right side positions
-            return CGPoint(x: pos.x - 65, y: pos.y + 10)
-        } else if ["utg", "utg+1", "utg+2"].contains(player.position) {
-            // Left side positions
-            return CGPoint(x: pos.x + 65, y: pos.y + 10)
+            // For cutoff on the right, place bet closer to the center
+            let betDistance: CGFloat = 50
+            return CGPoint(x: pos.x - (betDistance * 0.7), y: pos.y - (betDistance * 0.3))
         } else {
-            // For positions at the top of the table, place bets below
-            return CGPoint(x: pos.x, y: pos.y + 55)
+            // For all other positions, calculate based on vector to center
+            let betDistance: CGFloat = 60
+            let betX = pos.x - (normalizedX * betDistance)
+            let betY = pos.y - (normalizedY * betDistance)
+            
+            return CGPoint(x: betX, y: betY)
         }
     }
     
@@ -657,8 +588,8 @@ struct PlayerSeatView: View {
             return true
         }
         
-        // For villains, ONLY show cards at showdown when we've actually completed all actions
-        if !isFolded && isShowdownComplete {
+        // At showdown, reveal cards for non-folded players
+        if showdownRevealed && !isFolded {
             return true
         }
         
@@ -684,15 +615,10 @@ struct PlayerSeatView: View {
                 if shouldShowCards {
                     HStack(spacing: isHero ? 12 : 7) {
                         ForEach(0..<2, id: \.self) { index in
-                            if shouldRevealCardValues {
-                                // At showdown, show finalCards if available, otherwise fall back to regular cards
-                                if showdownRevealed && player.finalCards != nil && index < player.finalCards!.count {
-                                    CardView(card: Card(from: player.finalCards![index]))
-                                        .frame(width: cardWidth, height: cardHeight)
-                                } else if let cards = player.cards, index < cards.count {
-                                    CardView(card: Card(from: cards[index]))
-                                        .frame(width: cardWidth, height: cardHeight)
-                                }
+                            if shouldRevealCardValues, let cards = player.cards, index < cards.count {
+                                // Show the actual card if we should reveal values
+                                CardView(card: Card(from: cards[index]))
+                                    .frame(width: cardWidth, height: cardHeight)
                             } else {
                                 // Otherwise show a blank card
                                 ZStack {
@@ -714,7 +640,7 @@ struct PlayerSeatView: View {
                 }
                 
                 // Player info rectangle on top
-                VStack(spacing: isHero ? 4 : 4) {
+                VStack(spacing: isHero ? 8 : 4) {
                     ZStack {
                         if showCheck {
                             Text("CHECK")
@@ -727,17 +653,17 @@ struct PlayerSeatView: View {
                                 .zIndex(2)
                         }
                         Text(displayName)
-                            .font(.system(size: isHero ? 20 : fontSize, weight: .semibold))
+                            .font(.system(size: fontSize, weight: .semibold))
                             .foregroundColor(.white)
                     }
                     Text(String(format: "$%.0f", stack))
-                        .font(.system(size: isHero ? 18 : stackFontSize, weight: isHero ? .medium : .regular))
+                        .font(.system(size: stackFontSize))
                         .foregroundColor(isWinner ? .green : .white.opacity(0.9))
                 }
-                .frame(width: isHero ? 110 : rectWidth, height: isHero ? 60 : rectHeight)
+                .frame(width: rectWidth, height: rectHeight)
                 .background(
                     RoundedRectangle(cornerRadius: isHero ? 13 : 10)
-                        .fill(Color.black.opacity(isHero ? 0.9 : 0.8))
+                        .fill(Color.black.opacity(0.8))
                         .overlay(
                             RoundedRectangle(cornerRadius: isHero ? 13 : 10)
                                 .stroke(isWinner ? Color.green : Color.white.opacity(0.7), lineWidth: isWinner ? 2 : 1)
@@ -762,10 +688,9 @@ struct PlayerSeatView: View {
             // Bet amount in separate layer
             if let bet = betAmount, bet > 0 {
                 ChipView(amount: bet)
-                    .scaleEffect(isHero ? 1.0 : 0.8) // Larger chips for hero
+                    .scaleEffect(0.8)
                     .position(x: betPosition.x, y: betPosition.y)
                     .transition(.scale.combined(with: .opacity))
-                    .animation(.spring(response: 0.3), value: bet)
                     .zIndex(3)  // Always on top
             }
         }
@@ -808,108 +733,42 @@ struct DealerButtonView: View {
 struct ChipView: View {
     let amount: Double
     
-    // Define chip denominations and their colors
-    private let chipDenominations: [(value: Int, color: Color)] = [
-        (500, Color(red: 0.6, green: 0.0, blue: 0.6)), // Purple for 500
-        (100, Color(red: 0.0, green: 0.0, blue: 0.8)), // Blue for 100
-        (25, Color(red: 0.9, green: 0.0, blue: 0.0)),  // Red for 25
-        (5, Color(red: 0.0, green: 0.6, blue: 0.0)),   // Green for 5
-        (1, Color(red: 0.5, green: 0.5, blue: 0.5))    // Gray for 1
-    ]
-    
-    // Calculate how many of each chip to display
-    private func calculateChips() -> [(value: Int, count: Int, color: Color)] {
-        let intAmount = Int(amount)
-        var remainingAmount = intAmount
-        var result: [(value: Int, count: Int, color: Color)] = []
-        
-        for (value, color) in chipDenominations {
-            if remainingAmount >= value {
-                let count = min(remainingAmount / value, 3) // Cap at 3 chips per denomination for visual clarity
-                remainingAmount -= count * value
-                result.append((value: value, count: count, color: color))
-            }
-        }
-        
-        // Limit to 3 different denominations for visual clarity
-        if result.count > 3 {
-            result = Array(result.prefix(3))
-        }
-        
-        return result
-    }
-    
-    var body: some View {
-        let chipStacks = calculateChips()
-        
-        return ZStack {
-            // Chip stack
-            VStack(alignment: .center, spacing: 0) {
-                HStack(alignment: .bottom, spacing: -2) {
-                    // Create the chip stacks side by side for a more compact look
-                    ForEach(0..<chipStacks.count, id: \.self) { stackIndex in
-                        let stack = chipStacks[stackIndex]
-                        ZStack {
-                            // Stack the chips of the same value
-                            ForEach(0..<stack.count, id: \.self) { chipIndex in
-                                PokerChip(color: stack.color)
-                                    .offset(y: CGFloat(-chipIndex * 2)) // Slightly offset each chip for 3D effect
-                            }
-                        }
-                    }
-                }
-                
-                // Amount text below the chips
-                Text("$\(Int(amount))")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Color.black.opacity(0.7))
-                    .cornerRadius(6)
-                    .padding(.top, 2)
-            }
-        }
-        .frame(width: 55, height: 40)
-    }
-}
-
-// Individual poker chip component
-struct PokerChip: View {
-    let color: Color
-    
     var body: some View {
         ZStack {
-            // Outer ring
+            // Shadow
+            Circle()
+                .fill(Color.black.opacity(0.2))
+                .frame(width: 52, height: 52)
+                .offset(y: 2)
+            
+            // Base chip
             Circle()
                 .fill(Color.white)
-                .frame(width: 22, height: 22)
+                .frame(width: 50, height: 50)
             
-            // Colored center
+            // Colored chip center
             Circle()
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            color,
-                            color.opacity(0.7)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 18, height: 18)
+                .fill(LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 20/255, green: 150/255, blue: 20/255),
+                        Color(red: 10/255, green: 80/255, blue: 10/255)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .frame(width: 46, height: 46)
             
-            // Inner pattern ring
+            // Inner ring
             Circle()
                 .stroke(Color.white.opacity(0.7), lineWidth: 1)
-                .frame(width: 15, height: 15)
+                .frame(width: 40, height: 40)
             
-            // Edge detail
-            Circle()
-                .stroke(Color.white, lineWidth: 1)
-                .frame(width: 22, height: 22)
+            // Amount text
+            Text("$\(Int(amount))")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.5), radius: 1)
         }
-        .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 1)
     }
 }
 
