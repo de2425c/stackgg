@@ -291,9 +291,10 @@ struct HandsTab: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(handStore.savedHands) { savedHand in
-                    HandSummaryRow(hand: savedHand.hand)
+                    HandSummaryRow(hand: savedHand.hand, id: savedHand.id)
                         .background(Color.clear)
                         .cornerRadius(12)
+                        .environmentObject(handStore)
                 }
             }
             .padding()

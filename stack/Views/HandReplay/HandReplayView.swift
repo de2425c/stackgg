@@ -525,8 +525,8 @@ struct PlayerSeatView: View {
         
         // Special positioning for different seat positions
         if isHero {
-            // For hero, place bet slightly above and to the right
-            return CGPoint(x: pos.x + 70, y: pos.y - 10)
+            // For hero, place bet further up and to the right to avoid overlap
+            return CGPoint(x: pos.x + 85, y: pos.y - 30)
         } else if player.position == "small blind" || player.position == "big blind" {
             // For blinds on the left, place bet closer to the center
             let betDistance: CGFloat = 50

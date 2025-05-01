@@ -2,9 +2,12 @@ import SwiftUI
 
 struct HandSummaryRow: View {
     let hand: ParsedHandHistory
+    let id: String // Add ID for deletion
     @State private var showingReplay = false
+    @State private var showingDeleteAlert = false
     @EnvironmentObject var postService: PostService
     @EnvironmentObject var userService: UserService
+    @EnvironmentObject var handStore: HandStore
     
     private func formatMoney(_ amount: Double) -> String {
         if amount >= 0 {
@@ -49,6 +52,19 @@ struct HandSummaryRow: View {
                     )
                 
                 Spacer()
+                
+                // Delete Button
+                Button(action: {
+                    showingDeleteAlert = true
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundColor(.red.opacity(0.8))
+                        .padding(8)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .padding(.trailing, 10)
                 
                 // PnL
                 if let hero = hand.raw.players.first(where: { $0.isHero }) {
@@ -158,6 +174,16 @@ struct HandSummaryRow: View {
             HandReplayView(hand: hand)
                 .environmentObject(postService)
                 .environmentObject(userService)
+        }
+        .alert("Delete Hand History", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task {
+                    try? await handStore.deleteHand(id: id)
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this hand history? This action cannot be undone.")
         }
     }
 } 

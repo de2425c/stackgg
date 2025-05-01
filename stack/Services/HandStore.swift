@@ -54,4 +54,18 @@ class HandStore: ObservableObject {
                 print("Loaded \(self?.savedHands.count ?? 0) hands")
             }
     }
+    
+    func deleteHand(id: String) async throws {
+        // Delete the hand document from Firestore
+        try await db.collection("users")
+            .document(userId)
+            .collection("hands")
+            .document(id)
+            .delete()
+        
+        // Update the local state by removing the deleted hand
+        DispatchQueue.main.async {
+            self.savedHands.removeAll { $0.id == id }
+        }
+    }
 } 
