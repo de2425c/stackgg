@@ -13,40 +13,55 @@ struct FeedView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                // Using solid background color instead of AppBackgroundView
-                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
+            ZStack(alignment: .bottomTrailing) {
+                AppBackgroundView()
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Modern header with gradient - more Twitter-like
                     HStack {
-                        Text("STACK")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                        Button(action: {
+                            // Action for profile image tap, e.g., navigate to profile
+                        }) {
+                            if let avatarURL = userService.currentUserProfile?.avatarURL {
+                                AsyncImage(url: URL(string: avatarURL)) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                } placeholder: {
+                                    Circle()
+                                        .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                        .overlay(
+                                            Image(systemName: "person.fill")
+                                                .foregroundColor(.gray)
+                                                .font(.system(size: 18))
+                                        )
+                                }
+                                .frame(width: 36, height: 36)
+                                .clipShape(Circle())
+                            } else {
+                                Circle()
+                                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: 18))
+                                    )
+                            }
+                        }
                         
                         Spacer()
                         
-                        // Add post button in the top right
-                        Button(action: { showingNewPost = true }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                                .frame(width: 44, height: 44)
+                        Button(action: {
+                            // Action for notification bell tap
+                        }) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 18)
-                    .background(
-                        Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.98))
-                    )
-                    .overlay(
-                        Rectangle()
-                            .frame(height: 0.5)
-                            .foregroundColor(Color(UIColor(red: 50/255, green: 50/255, blue: 55/255, alpha: 1.0)))
-                            .padding(.bottom, -0.5),
-                        alignment: .bottom
-                    )
+                    .padding(.vertical, 12)
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {
@@ -75,7 +90,6 @@ struct FeedView: View {
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 32)
                                 
-                                // Update button text to be more generic
                                 Button(action: {
                                     if let profile = userService.currentUserProfile {
                                         navigateToFollowSuggestions()
@@ -97,7 +111,7 @@ struct FeedView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 60)
                         } else {
-                            LazyVStack(spacing: 1) {
+                            LazyVStack(spacing: 0) {
                                 ForEach(postService.posts) { post in
                                     PostRow(post: post)
                                         .onAppear {
@@ -107,6 +121,8 @@ struct FeedView: View {
                                                 }
                                             }
                                         }
+                                    Divider()
+                                        .background(Color.gray.opacity(0.3))
                                 }
                                 
                                 if postService.isLoading {
@@ -118,20 +134,26 @@ struct FeedView: View {
                             }
                         }
                         
-                        // Add padding at the bottom to ensure content isn't hidden by the floating button
                         Spacer(minLength: 80)
                     }
-                    .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
                 }
-                .background(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0)))
+
+                Button(action: { showingNewPost = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 10)
             }
-            .ignoresSafeArea(edges: .bottom)
             .navigationBarHidden(true)
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .onAppear {
-            // Remove UIKit appearance customizations that might conflict with HomePage
-            // Fetch posts
             Task {
                 try? await postService.fetchPosts()
             }
@@ -144,7 +166,6 @@ struct FeedView: View {
             }
         }
         .sheet(isPresented: $showingDiscoverUsers, onDismiss: {
-            // Refresh posts when returning from Discover Users view
             Task {
                 try? await postService.fetchPosts()
             }
@@ -172,10 +193,8 @@ struct PostRow: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Main content
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
-                    // Profile image
                     if let profileImage = post.profileImage {
                         AsyncImage(url: URL(string: profileImage)) { image in
                             image
@@ -185,25 +204,20 @@ struct PostRow: View {
                             Circle()
                                 .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
                         }
-                        .frame(width: 48, height: 48)
+                        .frame(width: 40, height: 40)
                         .clipShape(Circle())
                     } else {
-                        // Empty space if no profile image to maintain consistent layout
                         Circle()
                             .fill(Color.clear)
-                            .frame(width: 48, height: 48)
+                            .frame(width: 40, height: 40)
                     }
                     
-                    // Content
                     VStack(alignment: .leading, spacing: 3) {
-                        // Name and username row
                         HStack(spacing: 6) {
-                            // Display name or username if no display name
                             Text(post.displayName ?? post.username)
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.white)
                             
-                            // Always show @username
                             Text("@\(post.username)")
                                 .font(.system(size: 15))
                                 .foregroundColor(.gray)
@@ -224,33 +238,29 @@ struct PostRow: View {
                             }
                         }
                         
-                        // Time row below username
                         Text(post.createdAt.timeAgoDisplay())
                             .font(.system(size: 14))
                             .foregroundColor(.gray)
                     }
                 }
                 
-                // Post content - kept outside the HStack to allow full width
                 VStack(alignment: .leading, spacing: 8) {
                     Text(post.content)
                         .font(.system(size: 16))
                         .foregroundColor(.white)
                         .lineSpacing(5)
-                        .padding(.vertical, 12) // Increased vertical padding
+                        .padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 60) // Align with the content next to profile image
+                        .padding(.leading, 50)
                     
-                    // Hand post content
                     if post.postType == .hand, let hand = post.handHistory {
                         HandSummaryView(hand: hand, onReplayTap: {
                             showingReplay = true
                         })
                             .padding(.vertical, 10)
-                            .padding(.leading, 60) // Align with the content next to profile image
+                            .padding(.leading, 50)
                     }
                     
-                    // Images - Full width for better display
                     if let imageURLs = post.imageURLs, !imageURLs.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -269,10 +279,9 @@ struct PostRow: View {
                             }
                         }
                         .padding(.vertical, 10)
-                        .padding(.leading, 60) // Align with the content next to profile image
+                        .padding(.leading, 50)
                     }
                     
-                    // Actions
                     HStack(spacing: 36) {
                         Button(action: toggleLike) {
                             HStack(spacing: 8) {
@@ -299,21 +308,13 @@ struct PostRow: View {
                         Spacer()
                     }
                     .padding(.top, 8)
-                    .padding(.leading, 60) // Align with the content next to profile image
+                    .padding(.leading, 50)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.7))) // Semi-transparent background
-        // Clear separator between posts
-        .overlay(
-            Rectangle()
-                .frame(height: 6)
-                .foregroundColor(Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 0.7))) // Semi-transparent separator
-                .padding(.horizontal, 0),
-            alignment: .bottom
-        )
+        .background(Color.clear)
         .alert("Delete Post", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -370,12 +371,10 @@ struct NewPostView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Use solid background color instead of AppBackgroundView
                 Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Header
                     HStack(spacing: 16) {
                         if let profileImage = userProfile.avatarURL {
                             AsyncImage(url: URL(string: profileImage)) { image in
@@ -405,12 +404,10 @@ struct NewPostView: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 6) {
-                            // Display name in Twitter-style
                             Text(userProfile.displayName ?? userProfile.username)
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(.white)
                             
-                            // Username with the @ symbol
                             Text("@\(userProfile.username)")
                                 .font(.system(size: 15))
                                 .foregroundColor(.gray)
@@ -421,7 +418,6 @@ struct NewPostView: View {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 20)
                     
-                    // Text Editor
                     TextEditor(text: $postText)
                         .focused($isTextEditorFocused)
                         .foregroundColor(.white)
@@ -432,7 +428,6 @@ struct NewPostView: View {
                         .background(Color.clear)
                         .scrollContentBackground(.hidden)
                     
-                    // Selected Images
                     if !selectedImages.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -465,7 +460,6 @@ struct NewPostView: View {
                         }
                     }
                     
-                    // Bottom toolbar
                     HStack(spacing: 20) {
                         PhotosPicker(selection: $selectedItems,
                                    maxSelectionCount: 4,
@@ -506,7 +500,7 @@ struct NewPostView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
-                    .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.8))) // Semi-transparent
+                    .background(Color(UIColor(red: 20/255, green: 20/255, blue: 25/255, alpha: 0.8)))
                 }
             }
             .navigationTitle("New Post")
@@ -574,7 +568,6 @@ struct NewPostView: View {
     }
 }
 
-// Helper for time ago display
 extension Date {
     func timeAgoDisplay() -> String {
         let formatter = RelativeDateTimeFormatter()
