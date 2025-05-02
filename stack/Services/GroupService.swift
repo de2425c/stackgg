@@ -847,7 +847,8 @@ class GroupService: ObservableObject {
             "senderAvatarURL": avatarURL as Any,
             "timestamp": timestamp,
             "messageType": GroupMessage.MessageType.hand.rawValue,
-            "handHistoryId": handHistoryId
+            "handHistoryId": handHistoryId,
+            "handOwnerUserId": userId
         ]
         
         // Save the message

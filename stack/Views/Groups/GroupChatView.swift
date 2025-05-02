@@ -604,7 +604,7 @@ struct MessageRow: View {
                     case .hand:
                         if let handId = message.handHistoryId {
                             // Simple hand history preview for chat
-                            ChatHandPreview(handId: handId)
+                            ChatHandPreview(handId: handId, ownerUserId: message.handOwnerUserId ?? message.senderId)
                         }
                     }
                 }
@@ -625,9 +625,15 @@ struct MessageRow: View {
 // A simple preview of hand history for chat messages
 struct ChatHandPreview: View {
     let handId: String
+    // Optional owner ID of the hand history, may be provided in the message
+    var ownerUserId: String?
+    
     @State private var isLoading = true
     @State private var showingDetail = false
     @State private var savedHand: SavedHand?
+    @State private var loadError: String?
+    @State private var showError = false
+    
     @EnvironmentObject private var handStore: HandStore
     @EnvironmentObject private var postService: PostService
     @EnvironmentObject private var userService: UserService
@@ -636,6 +642,8 @@ struct ChatHandPreview: View {
         Button(action: {
             if savedHand != nil {
                 showingDetail = true
+            } else if loadError != nil {
+                showError = true
             }
         }) {
             VStack(alignment: .leading, spacing: 8) {
@@ -687,10 +695,11 @@ struct ChatHandPreview: View {
                         .font(.system(size: 12))
                         .foregroundColor(.gray)
                 } else {
-                    Text("Hand not found")
+                    Text(loadError ?? "Hand not found")
                         .font(.system(size: 14))
                         .foregroundColor(.gray)
                         .frame(width: 200, height: 80)
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(12)
@@ -707,6 +716,13 @@ struct ChatHandPreview: View {
                     .environmentObject(userService)
             }
         }
+        .alert(isPresented: $showError) {
+            Alert(
+                title: Text("Hand Not Available"),
+                message: Text(loadError ?? "The hand history could not be loaded."),
+                dismissButton: .default(Text("OK"))
+            )
+        }
         .onAppear {
             fetchHand()
         }
@@ -714,13 +730,37 @@ struct ChatHandPreview: View {
     
     private func fetchHand() {
         isLoading = true
+        loadError = nil
         
-        // Find the hand in the HandStore
+        // Try to get the hand from the user's own collection first
         if let hand = handStore.savedHands.first(where: { $0.id == handId }) {
             savedHand = hand
+            isLoading = false
+            return
         }
         
-        isLoading = false
+        // If not found, try to fetch it as a shared hand
+        Task {
+            do {
+                if let shared = try await handStore.fetchSharedHand(handId: handId, ownerUserId: ownerUserId) {
+                    await MainActor.run {
+                        savedHand = shared
+                        isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        loadError = "This hand is no longer available."
+                        isLoading = false
+                    }
+                }
+            } catch {
+                print("ERROR fetching shared hand: \(error.localizedDescription)")
+                await MainActor.run {
+                    loadError = "Failed to load hand: \(error.localizedDescription)"
+                    isLoading = false
+                }
+            }
+        }
     }
 }
 
