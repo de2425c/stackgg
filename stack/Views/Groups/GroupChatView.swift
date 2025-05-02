@@ -599,6 +599,45 @@ struct MessageRow: View {
                             }
                             .frame(maxWidth: 200, maxHeight: 150)
                             .cornerRadius(16)
+                        } else {
+                            // Handle different image states
+                            VStack {
+                                if let status = message.imageStatus {
+                                    switch status {
+                                    case "uploading":
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(1.2)
+                                            .frame(width: 200, height: 150)
+                                        Text("Uploading image...")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.gray)
+                                    case "error":
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.yellow)
+                                            .frame(width: 200, height: 90)
+                                        Text(message.errorMessage ?? "Failed to upload image")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.gray)
+                                            .multilineTextAlignment(.center)
+                                            .padding(.horizontal, 8)
+                                    default:
+                                        Image(systemName: "photo")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.gray)
+                                            .frame(width: 200, height: 150)
+                                    }
+                                } else {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 30))
+                                        .foregroundColor(.gray)
+                                        .frame(width: 200, height: 150)
+                                }
+                            }
+                            .frame(maxWidth: 200)
+                            .background(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
+                            .cornerRadius(16)
                         }
                         
                     case .hand:
