@@ -76,6 +76,7 @@ struct HomePage: View {
                     .tag(Tab.profile)
             }
             .background(Color.clear)
+            .toolbar(.hidden, for: .tabBar)
 
             CustomTabBar(
                 selectedTab: $selectedTab,
@@ -95,7 +96,6 @@ struct HomePage: View {
                 .zIndex(1)
             }
         }
-        .ignoresSafeArea(edges: .bottom)
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showingReplay) {
             if let hand = replayHand {
