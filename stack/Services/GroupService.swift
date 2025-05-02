@@ -771,18 +771,44 @@ class GroupService: ObservableObject {
         print("GROUP SERVICE: Image data created: \(finalImageData.count) bytes")
         
         let uuid = UUID().uuidString
-        let storageFileName = "\(uuid).jpg"
-        let storageRef = storage.reference().child("group_messages/\(groupId)/\(storageFileName)")
+        let storageRef = storage.reference().child("group_messages/\(groupId)/\(uuid).jpg")
         
         print("GROUP SERVICE: Starting Firebase Storage upload")
         
         // Upload the image to Firebase Storage
         do {
-            // 1. Upload the image data first
+            // Upload the image
             _ = try await storageRef.putData(finalImageData, metadata: nil)
             print("GROUP SERVICE: Image uploaded successfully")
             
-            // 2. Create the message document first with a placeholder URL
+            // Add a small delay to allow Firebase to process the upload
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+            
+            // Get the download URL with retries
+            var downloadURL: URL?
+            var retryCount = 0
+            let maxRetries = 3
+            
+            while downloadURL == nil && retryCount < maxRetries {
+                do {
+                    downloadURL = try await storageRef.downloadURL()
+                    print("GROUP SERVICE: Got download URL on attempt \(retryCount + 1): \(downloadURL?.absoluteString ?? "nil")")
+                } catch {
+                    retryCount += 1
+                    print("GROUP SERVICE: Failed to get download URL (attempt \(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                    if retryCount < maxRetries {
+                        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 second delay between retries
+                    }
+                }
+            }
+            
+            guard let finalURL = downloadURL else {
+                throw NSError(domain: "GroupService", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL after \(maxRetries) attempts"])
+            }
+            
+            let imageURL = finalURL.absoluteString
+            
+            // Create the message document
             let messageRef = db.collection("groups")
                 .document(groupId)
                 .collection("messages")
@@ -790,62 +816,19 @@ class GroupService: ObservableObject {
             
             let timestamp = Timestamp(date: Date())
             
-            var messageData: [String: Any] = [
+            let messageData: [String: Any] = [
                 "groupId": groupId,
                 "senderId": userId,
                 "senderName": senderName,
                 "senderAvatarURL": avatarURL as Any,
                 "timestamp": timestamp,
                 "messageType": GroupMessage.MessageType.image.rawValue,
-                "imageStatus": "uploading" // Indicate that the image is being uploaded
+                "imageURL": imageURL
             ]
             
-            // Save the initial message to indicate upload is in progress
+            // Save the message
             try await messageRef.setData(messageData)
-            
-            // 3. Attempt to get the download URL with retry logic
-            var downloadURL: URL?
-            var retryCount = 0
-            let maxRetries = 3
-            var lastError: Error?
-            
-            while downloadURL == nil && retryCount < maxRetries {
-                do {
-                    if retryCount > 0 {
-                        // Add exponential backoff delay
-                        let delaySeconds = pow(2.0, Double(retryCount))
-                        print("GROUP SERVICE: Retry \(retryCount) after \(delaySeconds) seconds")
-                        try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
-                    }
-                    
-                    // Try to get the download URL
-                    downloadURL = try await storageRef.downloadURL()
-                    print("GROUP SERVICE: Got download URL: \(downloadURL?.absoluteString ?? "nil")")
-                } catch {
-                    lastError = error
-                    print("GROUP SERVICE: Error getting download URL (attempt \(retryCount + 1)): \(error.localizedDescription)")
-                    retryCount += 1
-                }
-            }
-            
-            if let downloadURL = downloadURL {
-                // 4. Update the message with the actual image URL
-                messageData["imageURL"] = downloadURL.absoluteString
-                messageData["imageStatus"] = "complete" // Update status to complete
-                
-                // Update the message document with the image URL
-                try await messageRef.updateData(messageData)
-                print("GROUP SERVICE: Message document updated with URL")
-            } else {
-                // If we still couldn't get the URL after retries, update the message with an error
-                try await messageRef.updateData([
-                    "imageStatus": "error",
-                    "errorMessage": lastError?.localizedDescription ?? "Failed to get image URL"
-                ])
-                
-                throw lastError ?? NSError(domain: "GroupService", code: 1001, 
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to retrieve image URL after multiple attempts"])
-            }
+            print("GROUP SERVICE: Message document created")
             
             return
         } catch {

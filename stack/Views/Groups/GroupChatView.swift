@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseAuth
 import PhotosUI
 import Combine
+import Foundation
 
 // Add print statements for key lifecycle events
 extension View {
@@ -599,45 +600,6 @@ struct MessageRow: View {
                             }
                             .frame(maxWidth: 200, maxHeight: 150)
                             .cornerRadius(16)
-                        } else {
-                            // Handle different image states
-                            VStack {
-                                if let status = message.imageStatus {
-                                    switch status {
-                                    case "uploading":
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .scaleEffect(1.2)
-                                            .frame(width: 200, height: 150)
-                                        Text("Uploading image...")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.gray)
-                                    case "error":
-                                        Image(systemName: "exclamationmark.triangle")
-                                            .font(.system(size: 30))
-                                            .foregroundColor(.yellow)
-                                            .frame(width: 200, height: 90)
-                                        Text(message.errorMessage ?? "Failed to upload image")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.gray)
-                                            .multilineTextAlignment(.center)
-                                            .padding(.horizontal, 8)
-                                    default:
-                                        Image(systemName: "photo")
-                                            .font(.system(size: 30))
-                                            .foregroundColor(.gray)
-                                            .frame(width: 200, height: 150)
-                                    }
-                                } else {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 30))
-                                        .foregroundColor(.gray)
-                                        .frame(width: 200, height: 150)
-                                }
-                            }
-                            .frame(maxWidth: 200)
-                            .background(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
-                            .cornerRadius(16)
                         }
                         
                     case .hand:
@@ -689,65 +651,35 @@ struct ChatHandPreview: View {
                 if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .frame(width: 200, height: 80)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
                 } else if let hand = savedHand {
-                    // Hand preview content
-                    HStack {
-                        Image(systemName: "doc.text.fill")
-                            .foregroundColor(.white)
-                        
-                        Text("Hand History")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    
-                    Divider()
-                        .background(Color.gray.opacity(0.3))
-                    
-                    // Show stake and profit
-                    let profit = hand.hand.raw.pot.heroPnl
-                    HStack {
-                        Text("$\(Int(hand.hand.raw.gameInfo.smallBlind))/$\(Int(hand.hand.raw.gameInfo.bigBlind))")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        Spacer()
-                        
-                        Text(profit >= 0 ? "+$\(Int(profit))" : "-$\(abs(Int(profit)))")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(profit >= 0 ? .green : .red)
-                    }
-                    
-                    // Show hero cards if available
-                    if let hero = hand.hand.raw.players.first(where: { $0.isHero }),
-                       let cards = hero.cards {
-                        HStack(spacing: 4) {
-                            ForEach(cards, id: \.self) { card in
-                                Text(card)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                    }
-                    
-                    Text("Tap to view replay")
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                    // Use HandSummaryRow for displaying the hand
+                    HandSummaryRow(hand: hand.hand, id: handId)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(UIColor(red: 30/255, green: 30/255, blue: 35/255, alpha: 1.0)))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
                 } else {
                     Text(loadError ?? "Hand not found")
                         .font(.system(size: 14))
                         .foregroundColor(.gray)
-                        .frame(width: 200, height: 80)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 80)
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(12)
-            .frame(width: 200)
+            .padding(8)
+            .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 1.0)))
+                    .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 0.7)))
             )
         }
+        .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingDetail) {
             if let hand = savedHand {
                 HandReplayView(hand: hand.hand)

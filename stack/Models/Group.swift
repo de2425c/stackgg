@@ -187,8 +187,6 @@ struct GroupMessage: Identifiable, Codable {
     let imageURL: String?
     let handHistoryId: String?
     let handOwnerUserId: String?
-    let imageStatus: String?       // "uploading", "complete", "error"
-    let errorMessage: String?      // Error message if upload failed
     
     enum MessageType: String, Codable {
         case text
@@ -196,7 +194,7 @@ struct GroupMessage: Identifiable, Codable {
         case hand
     }
     
-    init(id: String, groupId: String, senderId: String, senderName: String, senderAvatarURL: String?, timestamp: Date, messageType: MessageType, text: String? = nil, imageURL: String? = nil, handHistoryId: String? = nil, handOwnerUserId: String? = nil, imageStatus: String? = nil, errorMessage: String? = nil) {
+    init(id: String, groupId: String, senderId: String, senderName: String, senderAvatarURL: String?, timestamp: Date, messageType: MessageType, text: String? = nil, imageURL: String? = nil, handHistoryId: String? = nil, handOwnerUserId: String? = nil) {
         self.id = id
         self.groupId = groupId
         self.senderId = senderId
@@ -208,8 +206,6 @@ struct GroupMessage: Identifiable, Codable {
         self.imageURL = imageURL
         self.handHistoryId = handHistoryId
         self.handOwnerUserId = handOwnerUserId
-        self.imageStatus = imageStatus
-        self.errorMessage = errorMessage
     }
     
     init(dictionary: [String: Any], id: String) throws {
@@ -234,7 +230,5 @@ struct GroupMessage: Identifiable, Codable {
         self.imageURL = dictionary["imageURL"] as? String
         self.handHistoryId = dictionary["handHistoryId"] as? String
         self.handOwnerUserId = dictionary["handOwnerUserId"] as? String
-        self.imageStatus = dictionary["imageStatus"] as? String
-        self.errorMessage = dictionary["errorMessage"] as? String
     }
 } 
