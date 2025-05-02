@@ -12,6 +12,8 @@ struct HomePage: View {
     @State private var showingSessionForm = false
     @StateObject private var sessionStore: SessionStore
     @StateObject private var handStore: HandStore
+    @StateObject private var postService = PostService()
+    @EnvironmentObject private var userService: UserService
     
     init(userId: String) {
         self.userId = userId
@@ -87,6 +89,10 @@ struct HomePage: View {
                     .tag(Tab.add)
                 
                 GroupsView()
+                    .environmentObject(userService)
+                    .environmentObject(handStore)
+                    .environmentObject(sessionStore)
+                    .environmentObject(postService)
                     .tag(Tab.groups)
                 
                 ProfileScreen(userId: userId)
@@ -573,38 +579,6 @@ struct AddHandView: View {
         
         let hostingController = UIHostingController(rootView: verificationView)
         topController.present(hostingController, animated: true)
-    }
-}
-
-struct GroupsView: View {
-    var body: some View {
-        ZStack {
-            // Add proper background color
-            Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                // Header
-                HStack {
-                    Text("GROUPS")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .padding(.bottom, 24)
-                
-                Spacer()
-                
-                Text("Groups Coming Soon")
-                    .foregroundColor(.white)
-                    .font(.system(size: 18, weight: .medium))
-                
-                Spacer()
-            }
-        }
-        .navigationBarHidden(true)
     }
 }
 
