@@ -28,7 +28,7 @@ enum HandParserError: Error {
 
 class HandParserService {
     static let shared = HandParserService()
-    private let baseURL = "http://localhost:8000"
+    private let baseURL = "https://parserstack-81cfab5fcac9.herokuapp.com"
     
     func parseHand(description: String) async throws -> ParsedHandHistory {
         guard let url = URL(string: "\(baseURL)/parse-hand") else {

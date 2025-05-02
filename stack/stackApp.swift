@@ -34,13 +34,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct stackApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authViewModel = AuthViewModel()
-    @StateObject var userService = UserService()
 
     var body: some Scene {
         WindowGroup {
             MainCoordinator()
                 .environmentObject(authViewModel)
-                .environmentObject(userService)
         }
     }
 }

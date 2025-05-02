@@ -76,11 +76,10 @@ struct Action: Codable {
 // MARK: - Pot
 struct Pot: Codable {
     let amount: Double
-    let rake: Double
     let distribution: [PotDistribution]?
     let heroPnl: Double
     enum CodingKeys: String, CodingKey {
-        case amount, rake, distribution
+        case amount, distribution
         case heroPnl = "hero_pnl"
     }
 }
