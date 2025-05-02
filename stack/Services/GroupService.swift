@@ -777,14 +777,36 @@ class GroupService: ObservableObject {
         
         // Upload the image to Firebase Storage
         do {
+            // Upload the image
             _ = try await storageRef.putData(finalImageData, metadata: nil)
             print("GROUP SERVICE: Image uploaded successfully")
             
-            // Get the download URL
-            let downloadURL = try await storageRef.downloadURL()
-            let imageURL = downloadURL.absoluteString
+            // Add a small delay to allow Firebase to process the upload
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
             
-            print("GROUP SERVICE: Got download URL: \(imageURL)")
+            // Get the download URL with retries
+            var downloadURL: URL?
+            var retryCount = 0
+            let maxRetries = 3
+            
+            while downloadURL == nil && retryCount < maxRetries {
+                do {
+                    downloadURL = try await storageRef.downloadURL()
+                    print("GROUP SERVICE: Got download URL on attempt \(retryCount + 1): \(downloadURL?.absoluteString ?? "nil")")
+                } catch {
+                    retryCount += 1
+                    print("GROUP SERVICE: Failed to get download URL (attempt \(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                    if retryCount < maxRetries {
+                        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 second delay between retries
+                    }
+                }
+            }
+            
+            guard let finalURL = downloadURL else {
+                throw NSError(domain: "GroupService", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL after \(maxRetries) attempts"])
+            }
+            
+            let imageURL = finalURL.absoluteString
             
             // Create the message document
             let messageRef = db.collection("groups")
@@ -847,7 +869,8 @@ class GroupService: ObservableObject {
             "senderAvatarURL": avatarURL as Any,
             "timestamp": timestamp,
             "messageType": GroupMessage.MessageType.hand.rawValue,
-            "handHistoryId": handHistoryId
+            "handHistoryId": handHistoryId,
+            "handOwnerUserId": userId
         ]
         
         // Save the message

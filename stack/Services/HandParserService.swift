@@ -88,4 +88,4 @@ class HandParserService {
             throw HandParserError.networkError(error)
         }
     }
-} 
+}

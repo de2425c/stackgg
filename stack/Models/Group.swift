@@ -186,6 +186,7 @@ struct GroupMessage: Identifiable, Codable {
     let text: String?
     let imageURL: String?
     let handHistoryId: String?
+    let handOwnerUserId: String?
     
     enum MessageType: String, Codable {
         case text
@@ -193,7 +194,7 @@ struct GroupMessage: Identifiable, Codable {
         case hand
     }
     
-    init(id: String, groupId: String, senderId: String, senderName: String, senderAvatarURL: String?, timestamp: Date, messageType: MessageType, text: String? = nil, imageURL: String? = nil, handHistoryId: String? = nil) {
+    init(id: String, groupId: String, senderId: String, senderName: String, senderAvatarURL: String?, timestamp: Date, messageType: MessageType, text: String? = nil, imageURL: String? = nil, handHistoryId: String? = nil, handOwnerUserId: String? = nil) {
         self.id = id
         self.groupId = groupId
         self.senderId = senderId
@@ -204,6 +205,7 @@ struct GroupMessage: Identifiable, Codable {
         self.text = text
         self.imageURL = imageURL
         self.handHistoryId = handHistoryId
+        self.handOwnerUserId = handOwnerUserId
     }
     
     init(dictionary: [String: Any], id: String) throws {
@@ -227,5 +229,6 @@ struct GroupMessage: Identifiable, Codable {
         self.text = dictionary["text"] as? String
         self.imageURL = dictionary["imageURL"] as? String
         self.handHistoryId = dictionary["handHistoryId"] as? String
+        self.handOwnerUserId = dictionary["handOwnerUserId"] as? String
     }
 } 

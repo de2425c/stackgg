@@ -20,7 +20,7 @@ struct Card: Identifiable {
 struct HandReplayView: View {
     let hand: ParsedHandHistory
     @Environment(\.dismiss) var dismiss
-    @State private var currentStreetIndex = 0 
+    @State private var currentStreetIndex = 0
     @State private var currentActionIndex = 0
     @State private var isPlaying = false
     @State private var potAmount: Double = 0
