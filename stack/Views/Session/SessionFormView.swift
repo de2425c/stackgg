@@ -122,21 +122,84 @@ struct GameInfoSection: View {
                 .foregroundColor(.white)
                 .padding(.leading, 2)
             
-            Grid(horizontalSpacing: 12) {
-                GridRow {
-                    CustomInputField(
-                        title: "Buy in",
-                        systemImage: "dollarsign.circle",
-                        text: $buyIn,
-                        keyboardType: .decimalPad
-                    )
-                    CustomInputField(
-                        title: "Cashout",
-                        systemImage: "banknote",
-                        text: $cashout,
-                        keyboardType: .decimalPad
-                    )
+            VStack(spacing: 16) {
+                // Enhanced Buy-in field
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Buy In")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Text("$")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 18, weight: .semibold))
+                        
+                        TextField("0.00", text: $buyIn)
+                            .keyboardType(.decimalPad)
+                            .foregroundColor(.white)
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(height: 44)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+                
+                // Enhanced Cashout field
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Cashout")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Text("$")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 18, weight: .semibold))
+                        
+                        TextField("0.00", text: $cashout)
+                            .keyboardType(.decimalPad)
+                            .foregroundColor(.white)
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(height: 44)
+                        
+                        // Show profit/loss preview if both fields have values
+                        if let buyInValue = Double(buyIn), let cashoutValue = Double(cashout) {
+                            let profit = cashoutValue - buyInValue
+                            let isProfit = profit >= 0
+                            
+                            Text(String(format: "%@$%.2f", isProfit ? "+" : "", profit))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(isProfit ? 
+                                    Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : 
+                                    Color.red)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(isProfit ? 
+                                            Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.2)) : 
+                                            Color.red.opacity(0.2))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
         }
         .padding(.horizontal)

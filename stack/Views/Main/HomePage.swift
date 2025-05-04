@@ -10,6 +10,8 @@ struct HomePage: View {
     @State private var showingReplay = false
     @State private var replayHand: ParsedHandHistory?
     @State private var showingSessionForm = false
+    @State private var showingLiveSession = false
+    @State private var liveSessionBarExpanded = false
     @StateObject private var sessionStore: SessionStore
     @StateObject private var handStore: HandStore
     @StateObject private var postService = PostService()
@@ -60,28 +62,41 @@ struct HomePage: View {
                     withAnimation { showingMenu = false }
                 }
             
-            TabView(selection: $selectedTab) {
-                DashboardView(userId: userId)
-                    .tag(Tab.dashboard)
+            // Main view structure
+            VStack(spacing: 0) {
+                // Live session bar (if active)
+                if sessionStore.showLiveSessionBar && !sessionStore.liveSession.isEnded {
+                    LiveSessionBar(
+                        sessionStore: sessionStore,
+                        isExpanded: $liveSessionBarExpanded,
+                        onTap: { showingLiveSession = true }
+                    )
+                }
                 
-                FeedView(userId: userId)
-                    .tag(Tab.feed)
-                
-                Color.clear // Placeholder for Add tab
-                    .tag(Tab.add)
-                
-                GroupsView()
-                    .environmentObject(userService)
-                    .environmentObject(handStore)
-                    .environmentObject(sessionStore)
-                    .environmentObject(postService)
-                    .tag(Tab.groups)
-                
-                ProfileScreen(userId: userId)
-                    .tag(Tab.profile)
+                // Main content
+                TabView(selection: $selectedTab) {
+                    DashboardView(userId: userId)
+                        .tag(Tab.dashboard)
+                    
+                    FeedView(userId: userId)
+                        .tag(Tab.feed)
+                    
+                    Color.clear // Placeholder for Add tab
+                        .tag(Tab.add)
+                    
+                    GroupsView()
+                        .environmentObject(userService)
+                        .environmentObject(handStore)
+                        .environmentObject(sessionStore)
+                        .environmentObject(postService)
+                        .tag(Tab.groups)
+                    
+                    ProfileScreen(userId: userId)
+                        .tag(Tab.profile)
+                }
+                .background(Color.clear)
+                .toolbar(.hidden, for: .tabBar)
             }
-            .background(Color.clear)
-            .toolbar(.hidden, for: .tabBar)
 
             // Add overlay that appears when menu is expanded
             if showingMenu {
@@ -104,7 +119,8 @@ struct HomePage: View {
                 showingMenu: $showingMenu,
                 showingNewPostSheet: $showingNewPostSheet,
                 showHandInputSheet: $showHandInputSheet,
-                showSessionFormSheet: $showingSessionForm
+                showSessionFormSheet: $showingSessionForm,
+                showLiveSessionSheet: $showingLiveSession
             )
             .frame(maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, 0)
@@ -119,6 +135,9 @@ struct HomePage: View {
         }
         .sheet(isPresented: $showingSessionForm) {
             SessionFormView(userId: userId)
+        }
+        .sheet(isPresented: $showingLiveSession) {
+            LiveSessionView(userId: userId, sessionStore: sessionStore)
         }
         // Add sheet modifier for NewPostView
         .sheet(isPresented: $showingNewPostSheet) {
@@ -149,6 +168,7 @@ struct CustomTabBar: View {
     @Binding var showingNewPostSheet: Bool
     @Binding var showHandInputSheet: Bool // Renamed for clarity
     @Binding var showSessionFormSheet: Bool // Renamed for clarity
+    @Binding var showLiveSessionSheet: Bool // New binding for live session
 
     private var accentColor: Color {
         Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
@@ -165,9 +185,7 @@ struct CustomTabBar: View {
             case .addHand:
                 showHandInputSheet = true
             case .liveSession:
-                // Add action for live session if available
-                print("Live Session Tapped")
-                break
+                showLiveSessionSheet = true
             case .pastSession:
                 showSessionFormSheet = true
             }
