@@ -137,18 +137,6 @@ struct FeedView: View {
                         Spacer(minLength: 80)
                     }
                 }
-
-                Button(action: { showingNewPost = true }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 10)
             }
             .navigationBarHidden(true)
         }
@@ -156,13 +144,6 @@ struct FeedView: View {
         .onAppear {
             Task {
                 try? await postService.fetchPosts()
-            }
-        }
-        .sheet(isPresented: $showingNewPost) {
-            if let profile = userService.currentUserProfile {
-                NewPostView(userId: userId, userProfile: profile, postService: postService)
-                    .environmentObject(postService)
-                    .environmentObject(userService)
             }
         }
         .sheet(isPresented: $showingDiscoverUsers, onDismiss: {
