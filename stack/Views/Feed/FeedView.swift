@@ -18,50 +18,7 @@ struct FeedView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    HStack {
-                        Button(action: {
-                            // Action for profile image tap, e.g., navigate to profile
-                        }) {
-                            if let avatarURL = userService.currentUserProfile?.avatarURL {
-                                AsyncImage(url: URL(string: avatarURL)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                } placeholder: {
-                                    Circle()
-                                        .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                                        .overlay(
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.gray)
-                                                .font(.system(size: 18))
-                                        )
-                                }
-                                .frame(width: 36, height: 36)
-                                .clipShape(Circle())
-                            } else {
-                                Circle()
-                                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                                    .frame(width: 36, height: 36)
-                                    .overlay(
-                                        Image(systemName: "person.fill")
-                                            .foregroundColor(.gray)
-                                            .font(.system(size: 18))
-                                    )
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            // Action for notification bell tap
-                        }) {
-                            Image(systemName: "bell")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
+                    AppHeaderView.standard(title: "Feed")
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {
@@ -137,18 +94,6 @@ struct FeedView: View {
                         Spacer(minLength: 80)
                     }
                 }
-
-                Button(action: { showingNewPost = true }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 10)
             }
             .navigationBarHidden(true)
         }
@@ -156,13 +101,6 @@ struct FeedView: View {
         .onAppear {
             Task {
                 try? await postService.fetchPosts()
-            }
-        }
-        .sheet(isPresented: $showingNewPost) {
-            if let profile = userService.currentUserProfile {
-                NewPostView(userId: userId, userProfile: profile, postService: postService)
-                    .environmentObject(postService)
-                    .environmentObject(userService)
             }
         }
         .sheet(isPresented: $showingDiscoverUsers, onDismiss: {
