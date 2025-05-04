@@ -23,6 +23,9 @@ struct DashboardView: View {
                 AppBackgroundView()
                 
                 VStack(spacing: 0) {
+                    // Use the standard factory method
+                    AppHeaderView.standard(title: "Dashboard")
+
                     // Top Tab Bar
                     HStack(spacing: 24) {
                         Spacer()
@@ -61,6 +64,7 @@ struct DashboardView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                /*
                 ToolbarItem(placement: .navigationBarLeading) {
                     // Use Profile Image instead of default icon
                     if let profile = userService.currentUserProfile, let urlString = profile.avatarURL, let url = URL(string: urlString) {
@@ -82,6 +86,7 @@ struct DashboardView: View {
                         .foregroundColor(.white)
                         .font(.system(size: 20))
                 }
+                */
             }
             // Hide the default navigation bar background
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -291,9 +296,10 @@ struct HandsTab: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(handStore.savedHands) { savedHand in
-                    HandSummaryRow(hand: savedHand.hand)
+                    HandSummaryRow(hand: savedHand.hand, id: savedHand.id)
                         .background(Color.clear)
                         .cornerRadius(12)
+                        .environmentObject(handStore)
                 }
             }
             .padding()

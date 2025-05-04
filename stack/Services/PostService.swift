@@ -78,7 +78,6 @@ class PostService: ObservableObject {
     
     private func fetchFollowingUsers() async throws -> [String] {
         guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("DEBUG: fetchFollowingUsers - No current user")
             return []
         }
         
@@ -91,7 +90,6 @@ class PostService: ObservableObject {
             userIds.append(document.documentID)
         }
         
-        print("DEBUG: fetchFollowingUsers - Following \(userIds.count) users including self")
         return userIds
     }
     
@@ -113,7 +111,6 @@ class PostService: ObservableObject {
                 let end = min(i + batchSize, followingUserIds.count)
                 let batch = Array(followingUserIds[i..<end])
                 
-                print("DEBUG: fetchPosts - Processing batch \(i/batchSize + 1) with \(batch.count) users")
                 
                 let query = db.collection("posts")
                     .whereField("userId", in: batch)
@@ -121,7 +118,6 @@ class PostService: ObservableObject {
                     .limit(to: 20)
                 
                 let batchSnapshot = try await query.getDocuments()
-                print("DEBUG: fetchPosts - Batch returned \(batchSnapshot.documents.count) posts")
                 
                 let batchPosts = try await processPosts(from: batchSnapshot)
                 allPosts.append(contentsOf: batchPosts)
@@ -138,9 +134,7 @@ class PostService: ObservableObject {
             self.posts = allPosts
             self.lastDocument = nil  // Reset for pagination
             
-            print("DEBUG: fetchPosts - Total posts fetched: \(allPosts.count)")
         } catch {
-            print("DEBUG: fetchPosts - Error: \(error.localizedDescription)")
             throw error
         }
     }

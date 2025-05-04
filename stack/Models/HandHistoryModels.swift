@@ -10,10 +10,12 @@ struct RawHandHistory: Codable {
     let players: [Player]
     let streets: [Street]
     let pot: Pot
+    let showdown: Bool?
     
     enum CodingKeys: String, CodingKey {
         case gameInfo = "game_info"
         case players, streets, pot
+        case showdown
     }
 }
 
@@ -76,11 +78,10 @@ struct Action: Codable {
 // MARK: - Pot
 struct Pot: Codable {
     let amount: Double
-    let rake: Double
     let distribution: [PotDistribution]?
     let heroPnl: Double
     enum CodingKeys: String, CodingKey {
-        case amount, rake, distribution
+        case amount, distribution
         case heroPnl = "hero_pnl"
     }
 }

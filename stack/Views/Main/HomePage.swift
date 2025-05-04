@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import PhotosUI
+import UIKit
 
 struct HomePage: View {
     @State private var selectedTab: Tab = .dashboard
@@ -11,7 +12,14 @@ struct HomePage: View {
     @State private var showingSessionForm = false
     @StateObject private var sessionStore: SessionStore
     @StateObject private var handStore: HandStore
+    @StateObject private var postService = PostService()
+    @EnvironmentObject private var userService: UserService
     
+    // Add state for the new post sheet
+    @State private var showingNewPostSheet = false
+    // Add state for AddHandView sheet (was previously local to AddMenuOverlay)
+    @State private var showHandInputSheet = false
+
     init(userId: String) {
         self.userId = userId
         _sessionStore = StateObject(wrappedValue: SessionStore(userId: userId))
@@ -45,30 +53,7 @@ struct HomePage: View {
     
     var body: some View {
         ZStack {
-            // Background that excludes the tab bar central button
-            ZStack {
-                // Full screen material blur
-                Color.black.opacity(0.5)
-                    .background(.thinMaterial)
-                    .ignoresSafeArea()
-                
-                // Cutout for the + button - positioned at center bottom
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Circle()
-                            .fill(Color.black.opacity(0.01)) // Nearly transparent
-                            .blendMode(.destinationOut) // This creates the "hole" effect
-                            .frame(width: 70, height: 70)
-                        Spacer()
-                    }
-                    .padding(.bottom, 20)
-                }
-            }
-            .compositingGroup() // Ensures the blendMode works properly
-            
-            // Dim overlay to darken screen outside the menu
+            // Base background
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
@@ -86,32 +71,46 @@ struct HomePage: View {
                     .tag(Tab.add)
                 
                 GroupsView()
+                    .environmentObject(userService)
+                    .environmentObject(handStore)
+                    .environmentObject(sessionStore)
+                    .environmentObject(postService)
                     .tag(Tab.groups)
                 
                 ProfileScreen(userId: userId)
                     .tag(Tab.profile)
             }
             .background(Color.clear)
+            .toolbar(.hidden, for: .tabBar)
+
+            // Add overlay that appears when menu is expanded
+            if showingMenu {
+                Color.black
+                    .opacity(0.4) // Semi-transparent
+                    .blur(radius: 0.5) // Very subtle blur
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showingMenu = false
+                        }
+                    }
+                    .transition(.opacity)
+                    .zIndex(1) // Above content but below TabBar
+            }
 
             CustomTabBar(
                 selectedTab: $selectedTab,
                 userId: userId,
-                showingMenu: $showingMenu
+                showingMenu: $showingMenu,
+                showingNewPostSheet: $showingNewPostSheet,
+                showHandInputSheet: $showHandInputSheet,
+                showSessionFormSheet: $showingSessionForm
             )
             .frame(maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, 0)
             .opacity(showingReplay ? 0 : 1)
-            
-            if showingMenu {
-                AddMenuOverlay(
-                    showingMenu: $showingMenu,
-                    userId: userId,
-                    showSessionForm: $showingSessionForm
-                )
-                .zIndex(1)
-            }
+            .zIndex(2) // Ensure tab bar stays above the overlay
         }
-        .ignoresSafeArea(edges: .bottom)
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showingReplay) {
             if let hand = replayHand {
@@ -120,6 +119,19 @@ struct HomePage: View {
         }
         .sheet(isPresented: $showingSessionForm) {
             SessionFormView(userId: userId)
+        }
+        // Add sheet modifier for NewPostView
+        .sheet(isPresented: $showingNewPostSheet) {
+            if let profile = userService.currentUserProfile {
+                NewPostView(userId: userId, userProfile: profile, postService: postService)
+                    .environmentObject(postService)
+                    .environmentObject(userService)
+            }
+        }
+        // Add sheet modifier for AddHandView
+        .sheet(isPresented: $showHandInputSheet) {
+            // Use the binding directly, dismiss handled by PillMenu logic
+            AddHandView(userId: userId, onDismiss: { showHandInputSheet = false })
         }
         .onDisappear {
             // Remove observer when view disappears
@@ -133,53 +145,174 @@ struct CustomTabBar: View {
     let userId: String
     @Binding var showingMenu: Bool
     
+    // Add state bindings for sheet presentation controlled by HomePage
+    @Binding var showingNewPostSheet: Bool
+    @Binding var showHandInputSheet: Bool // Renamed for clarity
+    @Binding var showSessionFormSheet: Bool // Renamed for clarity
+
+    private var accentColor: Color {
+        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
+    }
+    
+    // Define actions for the menu buttons
+    private func handleAction(actionType: MenuAction) {
+        showingMenu = false // Close menu after action
+        // Use a slight delay to allow menu closing animation to start
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            switch actionType {
+            case .newPost:
+                showingNewPostSheet = true
+            case .addHand:
+                showHandInputSheet = true
+            case .liveSession:
+                // Add action for live session if available
+                print("Live Session Tapped")
+                break
+            case .pastSession:
+                showSessionFormSheet = true
+            }
+        }
+    }
+    
+    enum MenuAction {
+        case newPost, addHand, liveSession, pastSession
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Background - Change to clear
-            Color.clear
-                .frame(height: 65)
-                .overlay(
-                    VStack(spacing: 0) {
-                        HStack(spacing: 0) {
-                            Spacer(minLength: 6)
-                            TabBarButton(
-                                icon: "Dashboard",
-                                title: "Dashboard",
-                                isSelected: selectedTab == .dashboard
-                            ) { selectedTab = .dashboard }
-                            TabBarButton(
-                                icon: "Feed",
-                                title: "Feed",
-                                isSelected: selectedTab == .feed
-                            ) { selectedTab = .feed }
-                            Spacer(minLength: 0)
-                            ZStack {
-                                Color.clear.frame(width: 1, height: 1)
-                                AddButton(userId: userId, showingMenu: $showingMenu)
-                                    .offset(y: -24)
-                            }
-                            .frame(width: 80, alignment: .center)
-                            Spacer(minLength: 0)
-                            TabBarButton(
-                                icon: "Groups",
-                                title: "Groups",
-                                isSelected: selectedTab == .groups
-                            ) { selectedTab = .groups }
-                            TabBarButton(
-                                icon: "Profile",
-                                title: "Profile",
-                                isSelected: selectedTab == .profile
-                            ) { selectedTab = .profile }
-                            Spacer(minLength: 6)
-                        }
-                        .padding(.horizontal, 0)
-                        .padding(.top, 8)
-                        .padding(.bottom, 22)
-                    }
-                )
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 6)
+                    TabBarButton(
+                        icon: "Dashboard",
+                        title: "Dashboard",
+                        isSelected: selectedTab == .dashboard
+                    ) { selectedTab = .dashboard }
+                    TabBarButton(
+                        icon: "Feed",
+                        title: "Feed",
+                        isSelected: selectedTab == .feed
+                    ) { selectedTab = .feed }
+                    Spacer(minLength: 0)
+                    
+                    // ZStack to layer the Add button and the animated menu pill
+                    ExpandingMenuView(
+                        showingMenu: $showingMenu,
+                        accentColor: accentColor,
+                        handleAction: handleAction
+                    )
+                    .frame(width: 80, alignment: .center) // Keep consistent width
+                    // No specific height needed here, let the view manage it
+
+                    Spacer(minLength: 0)
+                    TabBarButton(
+                        icon: "Groups",
+                        title: "Groups",
+                        isSelected: selectedTab == .groups
+                    ) { selectedTab = .groups }
+                    TabBarButton(
+                        icon: "Profile",
+                        title: "Profile",
+                        isSelected: selectedTab == .profile
+                    ) { selectedTab = .profile }
+                    Spacer(minLength: 6)
+                }
+                .padding(.horizontal, 0)
+                .padding(.top, 8)
+                .padding(.bottom, 22) 
+            }
+            .frame(height: 65)
         }
-        .frame(height: 78)
         .frame(maxWidth: .infinity)
+        .background(
+             Color(red: 0.05, green: 0.05, blue: 0.09) 
+                .ignoresSafeArea(edges: .bottom)
+        )
+        // Add tap gesture to background to dismiss menu? Consider if needed.
+    }
+}
+
+// Define the new ExpandingMenuView
+struct ExpandingMenuView: View {
+    @Binding var showingMenu: Bool
+    let accentColor: Color
+    let handleAction: (CustomTabBar.MenuAction) -> Void
+
+    // Constants for sizes
+    private let collapsedSize: CGFloat = 60
+    private let expandedHeight: CGFloat = 280 
+    private let iconSize: CGFloat = 22
+    private let buttonPadding: CGFloat = 15
+    
+    // Calculate how much of the pill should extend above the center
+    private var topExtension: CGFloat {
+        expandedHeight - collapsedSize
+    }
+
+    var body: some View {
+        ZStack(alignment: .center) { // Use center alignment
+            // Animated background shape
+            Capsule()
+                .fill(accentColor)
+                .frame(width: collapsedSize, height: showingMenu ? expandedHeight : collapsedSize)
+                // Position the capsule so it expands upward from the center
+                .offset(y: showingMenu ? -topExtension/2 : 0)
+                .shadow(color: accentColor.opacity(0.4), radius: 8, y: 4)
+                .onTapGesture { 
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showingMenu.toggle()
+                    }
+                }
+            
+            // Action Icons (appear when expanded)
+            if showingMenu {
+                VStack(spacing: buttonPadding) {
+                    // Four menu options
+                    PillButton(icon: "clock.arrow.circlepath", action: { handleAction(.pastSession) }, accentColor: accentColor, iconSize: iconSize)
+                    PillButton(icon: "clock", action: { handleAction(.liveSession) }, accentColor: accentColor, iconSize: iconSize)
+                    PillButton(icon: "doc.text", action: { handleAction(.addHand) }, accentColor: accentColor, iconSize: iconSize)
+                    PillButton(icon: "square.and.pencil", action: { handleAction(.newPost) }, accentColor: accentColor, iconSize: iconSize)
+                }
+                // Adjust the offset to ensure icons stay within the pill
+                .offset(y: -topExtension*0.65) // Reduced from 0.75 to 0.65
+                .padding(.top, 10) // Add some top padding to keep away from the edge
+                .opacity(showingMenu ? 1 : 0)
+                .scaleEffect(showingMenu ? 1 : 0.5, anchor: .bottom)
+                .animation(showingMenu ? .spring(response: 0.3, dampingFraction: 0.7).delay(0.1) : .spring(response: 0.2, dampingFraction: 0.7), value: showingMenu)
+            }
+            
+            // Plus/X Icon (always visible, rotates, stays fixed in place)
+            PlusIcon()
+                .frame(width: 28, height: 28)
+                .foregroundColor(.black)
+                .rotationEffect(.degrees(showingMenu ? 45 : 0))
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showingMenu.toggle()
+                    }
+                }
+        }
+        .frame(width: collapsedSize, height: collapsedSize) // Fixed frame for ZStack
+        .offset(y: -20) // Keep the overall vertical position adjustment
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showingMenu)
+    }
+}
+
+// Modify PillButton to accept iconSize
+struct PillButton: View {
+    let icon: String
+    let action: () -> Void
+    let accentColor: Color 
+    let iconSize: CGFloat // Added iconSize parameter
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: iconSize, weight: .medium))
+                .foregroundColor(.black) // Icon color on green background
+                .frame(width: 40, height: 40) // Consistent button tap area
+        }
+        .buttonStyle(PlainButtonStyle()) 
     }
 }
 
@@ -210,31 +343,6 @@ struct TabBarButton: View {
     }
 }
 
-struct AddButton: View {
-    let userId: String
-    @Binding var showingMenu: Bool
-
-    var body: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showingMenu.toggle()
-            }
-        }) {
-            ZStack {
-                Circle()
-                    .fill(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                    .frame(width: 60, height: 60)
-                    .shadow(color: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.3)), radius: 10)
-                PlusIcon()
-                    .frame(width: 28, height: 28)
-                    .foregroundColor(.black)
-                    .rotationEffect(.degrees(showingMenu ? 45 : 0))
-            }
-        }
-        .offset(x: 0)
-    }
-}
-
 struct PlusIcon: View {
     var body: some View {
         GeometryReader { geo in
@@ -250,53 +358,18 @@ struct PlusIcon: View {
     }
 }
 
-struct SleekMenuButton: View {
-    let icon: String
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.95)))
-                        .frame(width: 64, height: 64)
-                        .shadow(color: Color.green.opacity(0.25), radius: 12, y: 4)
-                        .overlay(
-                            Circle()
-                                .stroke(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)), lineWidth: 2)
-                        )
-                    Image(systemName: icon)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                }
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: Color.green.opacity(0.18), radius: 2, y: 1)
-            }
-            .padding(.vertical, 6)
-        }
-        .buttonStyle(PressableButtonStyle())
-    }
-}
-
-struct PressableButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-    }
-}
-
 // Break out the title view
 struct HandTitleView: View {
     var body: some View {
-        Text("Add Poker Hand")
-            .font(.system(size: 28, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.top, 12)
+        HStack {
+            Text("Add Hand History")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
     }
 }
 
@@ -436,139 +509,20 @@ struct ParseSuccessView: View {
     }
 }
 
-// Simplified AddHandView that uses the components
+// Simplified AddHandView that uses manual entry instead of parsing
 struct AddHandView: View {
     let userId: String
     var onDismiss: () -> Void
     @Environment(\.dismiss) var dismiss
-    @StateObject private var handStore = HandStore(userId: "")
-    @State private var handText = ""
-    @State private var isLoading = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var parsedHand: ParsedHandHistory?
-    @State private var showingSuccess = false
-    @FocusState private var isFocused: Bool
 
     init(userId: String, onDismiss: @escaping () -> Void) {
         self.userId = userId
         self.onDismiss = onDismiss
-        _handStore = StateObject(wrappedValue: HandStore(userId: userId))
     }
 
     var body: some View {
-        ZStack {
-            AppBackgroundView()
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                HandTitleView()
-                
-                VStack(spacing: 16) {
-                    HandTextEditorView(text: $handText, isFocused: $isFocused)
-                    
-                    ParseButtonView(
-                        isLoading: isLoading,
-                        isEmpty: handText.isEmpty,
-                        action: parseHand
-                    )
-                }
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(red: 0.12, green: 0.12, blue: 0.1))
-                        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 10)
-                )
-                .padding(.horizontal, 16)
-                
-                if let parsedHand = parsedHand {
-                    ParseSuccessView(parsedHand: parsedHand)
-                }
-                
-                Spacer()
-                
-                // Close button
-                Button(action: { onDismiss(); dismiss() }) {
-                    Circle()
-                        .fill(Color(red: 0.15, green: 0.15, blue: 0.18))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Image(systemName: "xmark")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                        )
-                        .shadow(color: .black.opacity(0.3), radius: 8)
-                }
-                .padding(.bottom, 16)
-            }
-            .padding(.top, 10)
-        }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-
-    private func parseHand() {
-        isLoading = true
-        Task {
-            do {
-                let parsed = try await HandParserService.shared.parseHand(description: handText)
-                self.parsedHand = parsed
-                try await handStore.saveHand(parsed)
-                
-                DispatchQueue.main.async {
-                    showingSuccess = true
-                    withAnimation {
-                        self.showingSuccess = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        onDismiss()
-                        dismiss()
-                    }
-                }
-            } catch let error as HandParserError {
-                errorMessage = error.message
-                showingError = true
-            } catch {
-                errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
-                showingError = true
-            }
-            isLoading = false
-        }
-    }
-}
-
-struct GroupsView: View {
-    var body: some View {
-        ZStack {
-            // Add proper background color
-            Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                // Header
-                HStack {
-                    Text("GROUPS")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .padding(.bottom, 24)
-                
-                Spacer()
-                
-                Text("Groups Coming Soon")
-                    .foregroundColor(.white)
-                    .font(.system(size: 18, weight: .medium))
-                
-                Spacer()
-            }
-        }
-        .navigationBarHidden(true)
+        // Present the Wizard, not the old single view
+        ManualHandEntryWizardView()
     }
 }
 
@@ -585,30 +539,8 @@ struct ProfileScreen: View {
                 AppBackgroundView()
                 
                 VStack(spacing: 0) {
-                    // STACK logo at the top
-                    HStack {
-                        Spacer()
-                        Text("STACK")
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                        Spacer()
-                        
-                        // Add sign out button to top right
-                        Button(action: signOut) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 18))
-                                .foregroundColor(.gray)
-                                .padding(8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 0.7)))
-                                )
-                        }
-                        .padding(.trailing, 16)
-                    }
-                    .padding(.top, 32)
-                    .padding(.bottom, 0)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    // Use the specialized profileWithStack header method
+                    AppHeaderView.profileWithStack(onLogout: signOut)
                     
                     Spacer(minLength: 0)
                     if let profile = userService.currentUserProfile {
@@ -882,97 +814,3 @@ struct ProfileEditView: View {
     }
 }
 
-struct AddMenuOverlay: View {
-    @Binding var showingMenu: Bool
-    let userId: String
-    @State private var showHandInput = false
-    @Binding var showSessionForm: Bool
-
-    var body: some View {
-        ZStack {
-            // Background that excludes the tab bar central button
-            ZStack {
-                // Full screen material blur
-                Color.black.opacity(0.5)
-                    .background(.thinMaterial)
-                    .ignoresSafeArea()
-                
-                // Cutout for the + button - positioned at center bottom
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Circle()
-                            .fill(Color.black.opacity(0.01)) // Nearly transparent
-                            .blendMode(.destinationOut) // This creates the "hole" effect
-                            .frame(width: 70, height: 70)
-                        Spacer()
-                    }
-                    .padding(.bottom, 20)
-                }
-            }
-            .compositingGroup() // Ensures the blendMode works properly
-            
-            // Dim overlay to darken screen outside the menu
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation { showingMenu = false }
-                }
-            
-            // Actual menu content
-            GeometryReader { geo in
-                VStack {
-                    Spacer()
-                    VStack(spacing: 32) {
-                        SleekMenuButton(
-                            icon: "clock.arrow.circlepath",
-                            title: "Past Session",
-                            action: {
-                                withAnimation(nil) {
-                                    showSessionForm = true
-                                    showingMenu = false
-                                }
-                            }
-                        )
-                        SleekMenuButton(
-                            icon: "clock",
-                            title: "Live Session",
-                            action: { showingMenu = false }
-                        )
-                        SleekMenuButton(
-                            icon: "doc.text",
-                            title: "Add Hand",
-                            action: { showHandInput = true }
-                        )
-                        
-                        // Spacer to push content up
-                        Spacer()
-                            .frame(height: geo.size.height * 0.15)
-                    }
-                }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
-            }
-            
-            // Invisible button directly over the + button to handle taps
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation { showingMenu = false }
-                    }) {
-                        Color.clear
-                            .frame(width: 70, height: 70)
-                    }
-                    Spacer()
-                }
-                .padding(.bottom, 20)
-            }
-        }
-        .transition(.opacity)
-        .sheet(isPresented: $showHandInput) {
-            AddHandView(userId: userId, onDismiss: { showHandInput = false; showingMenu = false })
-        }
-    }
-} 

@@ -221,22 +221,18 @@ struct HandSummaryView: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                            .fill(Color.gray.opacity(0.4))
                     )
-                    .shadow(color: Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.3)), radius: 2, y: 1)
+                    .shadow(color: .clear, radius: 0, y: 0)
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(red: 25/255, green: 25/255, blue: 30/255))
-                .shadow(color: .black.opacity(0.1), radius: 2)
-        )
+        .background(Color.clear)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
 }
