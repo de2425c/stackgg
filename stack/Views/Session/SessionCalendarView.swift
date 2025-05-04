@@ -144,9 +144,11 @@ struct SessionCalendarView: View {
             .listStyle(.plain)
             .background(Color.clear)
             .sheet(item: $sessionToShowDetails) { session in
-                SessionDetailsView(session: session, onShare: {
-                    self.sessionToShare = session
-                })
+                SessionDetailsView(
+                    session: session,
+                    onShare: { self.sessionToShare = session },
+                    sessionStore: sessionStore
+                )
                 .presentationDetents([.medium])
             }
             .fullScreenCover(item: $sessionToShare) { session in
