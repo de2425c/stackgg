@@ -110,17 +110,6 @@ struct HomePage: View {
             .padding(.bottom, 0)
             .opacity(showingReplay ? 0 : 1)
             .zIndex(2) // Ensure tab bar stays above the overlay
-            
-            // Remove the old AddMenuOverlay conditional view usage
-            // if showingMenu {
-            //     AddMenuOverlay(
-            //         showingMenu: $showingMenu,
-            //         userId: userId,
-            //         showSessionForm: $showingSessionForm,
-            //         showingNewPostSheet: $showingNewPostSheet
-            //     )
-            //     .zIndex(1)
-            // }
         }
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showingReplay) {
@@ -824,81 +813,4 @@ struct ProfileEditView: View {
         }
     }
 }
-
-
-struct AddMenuOverlay: View {
-    @Binding var showingMenu: Bool
-    let userId: String
-    @State private var showHandInput = false
-    @Binding var showSessionForm: Bool
-
-    var body: some View {
-        ZStack {
-            // Dim overlay to darken screen outside the menu
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation { showingMenu = false }
-                }
-            
-            // Actual menu content
-            GeometryReader { geo in
-                VStack {
-                    Spacer()
-                    VStack(spacing: 32) {
-                        SleekMenuButton(
-                            icon: "clock.arrow.circlepath",
-                            title: "Past Session",
-                            action: {
-                                withAnimation(nil) {
-                                    showSessionForm = true
-                                    showingMenu = false
-                                }
-                            }
-                        )
-                        SleekMenuButton(
-                            icon: "clock",
-                            title: "Live Session",
-                            action: { showingMenu = false }
-                        )
-                        SleekMenuButton(
-                            icon: "doc.text",
-                            title: "Add Hand",
-                            action: { showHandInput = true }
-                        )
-                        
-                        // Spacer to push content up
-                        Spacer()
-                            .frame(height: geo.size.height * 0.15)
-                    }
-                }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
-            }
-            
-            // Invisible button directly over the + button to handle taps
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation { showingMenu = false }
-                    }) {
-                        Color.clear
-                            .frame(width: 70, height: 70)
-                    }
-                    Spacer()
-                }
-                .padding(.bottom, 20)
-            }
-        }
-        .transition(.opacity)
-        .sheet(isPresented: $showHandInput) {
-            ManualHandEntryWizardView()
-                .onDisappear {
-                    showHandInput = false
-                    showingMenu = false
-                }
-        }
-    }
-} 
 
