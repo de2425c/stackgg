@@ -667,30 +667,8 @@ struct ProfileScreen: View {
                 AppBackgroundView()
                 
                 VStack(spacing: 0) {
-                    // STACK logo at the top
-                    HStack {
-                        Spacer()
-                        Text("STACK")
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                        Spacer()
-                        
-                        // Add sign out button to top right
-                        Button(action: signOut) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 18))
-                                .foregroundColor(.gray)
-                                .padding(8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color(UIColor(red: 40/255, green: 40/255, blue: 45/255, alpha: 0.7)))
-                                )
-                        }
-                        .padding(.trailing, 16)
-                    }
-                    .padding(.top, 32)
-                    .padding(.bottom, 0)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    // Use the specialized profileWithStack header method
+                    AppHeaderView.profileWithStack(onLogout: signOut)
                     
                     Spacer(minLength: 0)
                     if let profile = userService.currentUserProfile {

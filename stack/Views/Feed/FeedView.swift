@@ -18,50 +18,7 @@ struct FeedView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    HStack {
-                        Button(action: {
-                            // Action for profile image tap, e.g., navigate to profile
-                        }) {
-                            if let avatarURL = userService.currentUserProfile?.avatarURL {
-                                AsyncImage(url: URL(string: avatarURL)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                } placeholder: {
-                                    Circle()
-                                        .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                                        .overlay(
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.gray)
-                                                .font(.system(size: 18))
-                                        )
-                                }
-                                .frame(width: 36, height: 36)
-                                .clipShape(Circle())
-                            } else {
-                                Circle()
-                                    .fill(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
-                                    .frame(width: 36, height: 36)
-                                    .overlay(
-                                        Image(systemName: "person.fill")
-                                            .foregroundColor(.gray)
-                                            .font(.system(size: 18))
-                                    )
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            // Action for notification bell tap
-                        }) {
-                            Image(systemName: "bell")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
+                    AppHeaderView.standard(title: "Feed")
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {
