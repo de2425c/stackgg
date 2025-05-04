@@ -36,11 +36,19 @@ struct HandReplayView: View {
     @State private var showingShareSheet = false
     @State private var showingShareAlert = false
     @State private var isShowdownComplete = false
+    @State private var highestBetOnStreet: Double = 0
+    @State private var showWinnerPopup = false
+    @State private var winnerName = ""
+    @State private var winningHand = ""
     @EnvironmentObject var postService: PostService
     @EnvironmentObject var userService: UserService
     
     private let tableColor = Color(red: 45/255, green: 120/255, blue: 65/255)
     private let tableBorderColor = Color(red: 74/255, green: 54/255, blue: 38/255)
+    
+    // Use standard card size for all cards
+    let cardWidth: CGFloat = 36
+    let cardHeight: CGFloat = 52
     
     private var hasMoreActions: Bool {
         guard currentStreetIndex < hand.raw.streets.count else { return false }
@@ -61,6 +69,11 @@ struct HandReplayView: View {
         guard currentStreetIndex == hand.raw.streets.count - 1 else { return false }
         let currentStreet = hand.raw.streets[currentStreetIndex]
         return currentActionIndex >= currentStreet.actions.count
+    }
+    
+    // New property to track if we need one final click for showdown
+    private var needsShowdownClick: Bool {
+        isHandComplete && !isShowdownComplete && (hand.raw.showdown ?? false)
     }
     
     var body: some View {
@@ -94,7 +107,7 @@ struct HandReplayView: View {
                         .padding(.trailing, 16)
                         .padding(.top, 8)
                     }
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 10)
                     
                     Spacer()
                     
@@ -107,7 +120,7 @@ struct HandReplayView: View {
                                 Ellipse()
                                     .stroke(tableBorderColor, lineWidth: 8)
                             )
-                            .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.75)
+                            .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.78)
                             .position(x: geometry.size.width / 2, y: geometry.size.height * 0.4)
                             .shadow(color: .black.opacity(0.5), radius: 10)
                         
@@ -116,7 +129,7 @@ struct HandReplayView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .opacity(0.3)
-                            .offset(y: -geometry.size.height * 0.12) // Moved up above pot
+                            .offset(y: -geometry.size.height * 0.14)
 
                         // Pot display - centered at middle of table
                         if potAmount > 0 {
@@ -124,12 +137,12 @@ struct HandReplayView: View {
                                 .scaleEffect(1.2) // Scale up for better visibility
                                 .transition(.scale.combined(with: .opacity))
                                 .animation(.spring(response: 0.4), value: potAmount)
-                                .offset(y: geometry.size.height * 0.02) // Moved down further
+                                .offset(y: geometry.size.height * 0.0)
                         }
 
                         // Community Cards - positioned closer to hero
                         CommunityCardsView(cards: allCommunityCards)
-                            .offset(y: geometry.size.height * 0.10) // Adjusted position
+                            .offset(y: geometry.size.height * 0.08)
                             .scaleEffect(1.15) // Make it slightly larger overall
 
                         // Player Seats
@@ -151,8 +164,44 @@ struct HandReplayView: View {
                                 isShowdownComplete: isShowdownComplete
                             )
                         }
+                        
+                        // Winner Popup - shows who won the hand
+                        if showWinnerPopup {
+                            VStack(spacing: 10) {
+                                Text(winnerName + " Wins!")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                
+                                if !winningHand.isEmpty {
+                                    Text("with " + winningHand)
+                                        .font(.system(size: 18, weight: .medium))
+                                        .foregroundColor(.yellow)
+                                }
+                                
+                                Button("OK") {
+                                    withAnimation {
+                                        showWinnerPopup = false
+                                    }
+                                }
+                                .padding(.horizontal, 30)
+                                .padding(.vertical, 10)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                                .padding(.top, 10)
+                            }
+                            .padding(20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.black.opacity(0.9))
+                                    .shadow(color: .black.opacity(0.5), radius: 10)
+                            )
+                            .padding(40)
+                            .transition(.scale.combined(with: .opacity))
+                            .zIndex(100) // Ensure it's on top
+                        }
                     }
-                    .frame(height: geometry.size.height * 0.75)
+                    .frame(height: geometry.size.height * 0.78)
                     
                     Spacer()
                         .frame(height: 0) // Collapse this spacer
@@ -169,17 +218,17 @@ struct HandReplayView: View {
                         }
                         
                         Button(action: nextAction) {
-                            Text("Next")
+                            Text(needsShowdownClick ? "Show Cards" : "Next")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
                                 .frame(width: 100, height: 36)
                                 .background(Color(red: 123/255, green: 255/255, blue: 99/255))
-                                .opacity(isPlaying && hasMoreActions ? 1 : 0.5)
+                                .opacity(isPlaying && (hasMoreActions || needsShowdownClick) ? 1 : 0.5)
                                 .cornerRadius(18)
                         }
-                        .disabled(!isPlaying || !hasMoreActions)
+                        .disabled(!isPlaying || (!hasMoreActions && !needsShowdownClick))
                     }
-                    .padding(.vertical, 38)
+                    .padding(.vertical, 25)
                     .frame(maxWidth: .infinity)
                     .background(
                         Color.black.opacity(0)
@@ -206,8 +255,49 @@ struct HandReplayView: View {
     }
     
     private func initializeStacks() {
+        // Initialize player stacks
         hand.raw.players.forEach { player in
             playerStacks[player.name] = player.stack
+        }
+        
+        // Print info about cards for debugging
+        hand.raw.players.forEach { player in
+            if player.cards != nil && !player.cards!.isEmpty {
+                print("Player \(player.name) has \(player.cards!.count) cards: \(player.cards!.joined(separator: ", "))")
+            }
+            if player.finalCards != nil && !player.finalCards!.isEmpty {
+                print("Player \(player.name) has \(player.finalCards!.count) final cards: \(player.finalCards!.joined(separator: ", "))")
+            }
+        }
+        
+        // Ensure the dealer button is set - set it manually
+        // This is especially important for players who should have the BTN position
+        for player in hand.raw.players {
+            if player.position == "BTN" {
+                // Make sure the player with BTN position is marked as the dealer
+                print("Found BTN player: \(player.name) - marking as dealer")
+            }
+        }
+        
+        // Check showdown flag to ensure it's properly set
+        if let showdown = hand.raw.showdown {
+            print("Hand has showdown = \(showdown)")
+            if showdown {
+                // If hand has showdown, ensure we have proper data for card reveal
+                let playersWithCards = hand.raw.players.filter { $0.cards != nil && !$0.cards!.isEmpty }
+                if playersWithCards.count <= 1 {
+                    print("WARNING: Showdown flag is true but only \(playersWithCards.count) players have cards")
+                }
+            }
+        } else {
+            print("Hand does not have explicit showdown flag")
+        }
+        
+        // Log pot distribution for debugging
+        if let distribution = hand.raw.pot.distribution {
+            print("Hand has pot distribution: \(distribution.map { "\($0.playerName): $\($0.amount)" }.joined(separator: ", "))")
+        } else {
+            print("Hand does not have pot distribution data")
         }
     }
     
@@ -220,20 +310,38 @@ struct HandReplayView: View {
         potAmount = 0
         foldedPlayers.removeAll()
         playerBets.removeAll()
-        showdownRevealed = false
         winningPlayers.removeAll()
         showPotDistribution = false
         lastCheckPlayer = nil
         showCheckAnimation = false
+        highestBetOnStreet = 0
+        showdownRevealed = false
         isShowdownComplete = false
+        showWinnerPopup = false
         
-        print("DEBUG - startReplay(): All state reset, isShowdownComplete=false")
+        print("DEBUG - startReplay(): All state reset, cards will be revealed at the end of the hand")
         
         // Initialize player stacks to their starting values
         initializeStacks()
     }
     
     private func nextAction() {
+        // If hand is complete but we need one more click for showdown, handle that
+        if isHandComplete && !isShowdownComplete && (hand.raw.showdown ?? false) {
+            print("DEBUG - Final showdown click: Revealing all cards now")
+            withAnimation(.easeInOut(duration: 0.5)) {
+                showdownRevealed = true
+                isShowdownComplete = true
+                
+                // Show winner popup after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    showWinnerAnnouncement()
+                }
+            }
+            return
+        }
+        
+        // Otherwise, if hand is complete, do nothing
         guard !isHandComplete else { return }
         
         if currentStreetIndex < hand.raw.streets.count {
@@ -259,14 +367,31 @@ struct HandReplayView: View {
                 // Process the current action
                 processAction(action)
                 
+                // Check if this is the LAST action of the LAST street (especially river)
+                let isLastAction = currentActionIndex == currentStreet.actions.count - 1 
+                let isLastStreet = currentStreetIndex == hand.raw.streets.count - 1
+                
+                // If this is the last action of the last street AND showdown is true, reveal cards immediately
+                if isLastAction && isLastStreet && (hand.raw.showdown ?? false) {
+                    print("DEBUG - Last action on river with showdown=true, revealing cards immediately")
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showdownRevealed = true
+                        isShowdownComplete = true
+                        
+                        // Show winner popup after a short delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            showWinnerAnnouncement()
+                        }
+                    }
+                }
+                
                 currentActionIndex += 1
             } else if currentStreetIndex + 1 < hand.raw.streets.count {
                 // Move to the next street
                 currentStreetIndex += 1
                 currentActionIndex = 0
-                
-                // Clear bet displays but NOT the pot amount
-                playerBets.removeAll()
+                playerBets.removeAll() // Clear bet displays for the new street
+                highestBetOnStreet = 0 // Reset highest bet for the new street
             } else {
                 // No more actions or streets - time for showdown
                 handleShowdown()
@@ -274,84 +399,226 @@ struct HandReplayView: View {
         }
     }
     
-    private func processAction(_ action: Action) {
-        switch action.action.lowercased() {
-        case "folds":
-            foldedPlayers.insert(action.playerName)
-            playerBets[action.playerName] = nil // Remove any existing bet display
-            
-        case "bets":
-            if let stack = playerStacks[action.playerName] {
-                // Subtract from player's stack
-                playerStacks[action.playerName] = stack - action.amount
+    // New function to show winner announcement
+    private func showWinnerAnnouncement() {
+        withAnimation(.spring()) {
+            // Determine winner name and hand
+            if let distribution = hand.raw.pot.distribution, !distribution.isEmpty {
+                // Find winner with highest amount
+                let sortedWinners = distribution.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount }
                 
-                // Add to pot
-                potAmount += action.amount
-                
-                // Display the bet
-                playerBets[action.playerName] = action.amount
-            }
-            
-        case "raises":
-            if let stack = playerStacks[action.playerName] {
-                // Subtract from player's stack
-                playerStacks[action.playerName] = stack - action.amount
-                
-                // Add to pot
-                potAmount += action.amount
-                
-                // Display the bet
-                playerBets[action.playerName] = action.amount
-            }
-            
-        case "calls":
-            if let stack = playerStacks[action.playerName] {
-                // Subtract from player's stack
-                playerStacks[action.playerName] = stack - action.amount
-                
-                // Add to pot
-                potAmount += action.amount
-                
-                // If player already has a bet, add to it (for blinds or previous street action)
-                if let existingBet = playerBets[action.playerName] {
-                    playerBets[action.playerName] = existingBet + action.amount
-                } else {
-                    playerBets[action.playerName] = action.amount
+                if let winner = sortedWinners.first {
+                    winnerName = winner.playerName
+                    
+                    // Use the HandEvaluator to get a better description of winning hand when available
+                    if let winnerCards = hand.raw.players.first(where: { $0.name == winner.playerName })?.finalCards {
+                        let communityCards = getCommunityCards()
+                        if !winnerCards.isEmpty && !communityCards.isEmpty {
+                            // Combine player cards with community cards for best hand evaluation
+                            let allCards = winnerCards + communityCards
+                            // Use HandEvaluator to get proper hand description
+                            winningHand = HandEvaluator.getHandDescription(cards: allCards)
+                        } else {
+                            winningHand = winner.hand
+                        }
+                    } else {
+                        winningHand = winner.hand
+                    }
+                    
+                    showWinnerPopup = true
+                    
+                    // Auto-dismiss after a few seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation {
+                            showWinnerPopup = false
+                        }
+                    }
+                    return
                 }
             }
             
-        case "checks":
-            // No changes to stacks or pot for checks
-            break
+            // Fallback if no distribution data - Calculate best hand using HandEvaluator
+            let activePlayers = hand.raw.players.filter { !foldedPlayers.contains($0.name) }
+            let communityCards = getCommunityCards()
             
-        default:
-            // Handle "Bets" for blinds - special case
-            if action.amount > 0 {
-                if let stack = playerStacks[action.playerName] {
-                    // Subtract from player's stack
-                    playerStacks[action.playerName] = stack - action.amount
+            if !activePlayers.isEmpty && !communityCards.isEmpty {
+                var playerHands: [(playerName: String, cards: [String])] = []
+                
+                for player in activePlayers {
+                    if let playerCards = player.finalCards ?? player.cards, !playerCards.isEmpty {
+                        // Combine player's hole cards with community cards
+                        let allCards = playerCards + communityCards
+                        playerHands.append((player.name, allCards))
+                    }
+                }
+                
+                if !playerHands.isEmpty {
+                    // Determine winner using HandEvaluator
+                    let results = HandEvaluator.determineWinner(hands: playerHands)
+                    let winners = results.filter { $0.winner }
                     
-                    // Add to pot
-                    potAmount += action.amount
-                    
-                    // Display the bet
-                    playerBets[action.playerName] = action.amount
+                    if let winner = winners.first {
+                        winnerName = winner.playerName
+                        winningHand = winner.handDescription
+                        showWinnerPopup = true
+                        
+                        // Auto-dismiss after a few seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation {
+                                showWinnerPopup = false
+                            }
+                        }
+                        return
+                    }
+                }
+            }
+            
+            // Last resort fallback if hand evaluation fails
+            let heroPlayer = hand.raw.players.first { $0.isHero }
+            
+            if let hero = heroPlayer {
+                let heroPnl = hand.raw.pot.heroPnl ?? 0
+                if heroPnl > 0 {
+                    winnerName = hero.name
+                    winningHand = hero.finalHand ?? "winning hand"
+                } else {
+                    // Find a non-folded villain
+                    let activeVillains = hand.raw.players.filter { !$0.isHero && !foldedPlayers.contains($0.name) }
+                    if let villain = activeVillains.first {
+                        winnerName = villain.name
+                        winningHand = villain.finalHand ?? "winning hand"
+                    } else {
+                        winnerName = "Unknown Player"
+                        winningHand = ""
+                    }
+                }
+                showWinnerPopup = true
+                
+                // Auto-dismiss after a few seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation {
+                        showWinnerPopup = false
+                    }
                 }
             }
         }
     }
     
+    // Helper function to get all community cards
+    private func getCommunityCards() -> [String] {
+        return hand.raw.streets.flatMap { $0.cards }
+    }
+    
+    private func processAction(_ action: Action) {
+        // Ensure player exists in stacks; handle error if not
+        guard let stack = playerStacks[action.playerName] else {
+            print("Error: Player \(action.playerName) not found in stacks during action processing.")
+            // Consider how to handle this - skip action, show error?
+            return
+        }
+        // Get amount player has already put in on this street (from playerBets)
+        let investedThisStreet = playerBets[action.playerName] ?? 0
+
+        switch action.action.lowercased() {
+        case "folds":
+            foldedPlayers.insert(action.playerName)
+            playerBets[action.playerName] = nil // Remove bet display
+
+        case "checks":
+            // No changes needed for stacks or pot
+            // Animation is handled in nextAction before calling this
+            break // Explicit break
+
+        case "bets":
+            let betAmountTotal = action.amount // Amount is the total bet size (e.g., bet $10)
+            let amountToAdd = max(0, betAmountTotal - investedThisStreet) // Actual new money going in
+            playerStacks[action.playerName] = stack - amountToAdd
+            potAmount += amountToAdd
+            playerBets[action.playerName] = betAmountTotal // Update total displayed bet for this street
+            highestBetOnStreet = max(highestBetOnStreet, betAmountTotal) // Update highest bet
+
+        case "calls":
+            // Calculate amount needed to call the current highest bet
+            let callAmount = max(0, highestBetOnStreet - investedThisStreet)
+            playerStacks[action.playerName] = stack - callAmount
+            potAmount += callAmount
+            // Player has now matched the highest bet for the street
+            playerBets[action.playerName] = highestBetOnStreet
+
+        case "raises":
+            let raiseAmountTotal = action.amount // Amount is the total size of the raise (e.g., raise to $30)
+            let amountToAdd = max(0, raiseAmountTotal - investedThisStreet) // Actual new money going in
+            playerStacks[action.playerName] = stack - amountToAdd
+            potAmount += amountToAdd
+            playerBets[action.playerName] = raiseAmountTotal // Update total displayed bet for this street
+            highestBetOnStreet = max(highestBetOnStreet, raiseAmountTotal) // Update highest bet
+
+        case "posts small blind", "posts big blind", "posts":
+            // Treat blinds and posts similar to a bet in terms of stack/pot changes
+            let postAmount = action.amount
+            playerStacks[action.playerName] = stack - postAmount
+            potAmount += postAmount
+            playerBets[action.playerName] = postAmount // Display the post amount as a bet
+            highestBetOnStreet = max(highestBetOnStreet, postAmount) // Posts set the bet level
+
+        // Handle other potential actions if they exist in your hand history format
+        // (e.g., "all-in", "shows", "mucks")
+        default:
+            print("Warning: Unhandled action type '\(action.action)' for player \(action.playerName)")
+            // If an action involves an amount (like maybe an uncategorized "bets"),
+            // you might need a fallback, but explicit handling is better.
+            // Example: if action.amount > 0 { /* handle generic bet? */ }
+        }
+    }
+    
     private func handleShowdown() {
-        print("DEBUG - handleShowdown() called - Setting isShowdownComplete=true")
+        print("DEBUG - handleShowdown() called - Checking if card reveal is needed")
         
-        // Reveal cards at showdown
+        // Only reveal cards if it's explicitly a showdown hand or there are multiple active players
         withAnimation(.easeInOut(duration: 0.5)) {
-            showdownRevealed = true
+            // Mark hand as complete, but don't immediately show cards
+            
+            // CRITICAL: Check hand.raw.showdown to determine if cards should be revealed
+            if let showdown = hand.raw.showdown, showdown == true {
+                print("DEBUG - Hand has showdown=true flag, revealing cards immediately at end")
+                showdownRevealed = true
+                isShowdownComplete = true
+                
+                // Show winner popup after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    showWinnerAnnouncement()
+                }
+            } else {
+                // For non-showdown hands, check if multiple players are active
+                let activePlayerCount = hand.raw.players.filter { !foldedPlayers.contains($0.name) }.count
+                if activePlayerCount > 1 {
+                    print("DEBUG - Multiple active players at showdown but no explicit flag. Revealing immediately.")
+                    showdownRevealed = true
+                    isShowdownComplete = true
+                    
+                    // Show winner popup after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        showWinnerAnnouncement()
+                    }
+                } else {
+                    print("DEBUG - No showdown: \(activePlayerCount) active player(s) and showdown flag is \(hand.raw.showdown)")
+                    showdownRevealed = false
+                    isShowdownComplete = false
+                }
+            }
         }
         
-        // Determine winners based on pot distribution
+        // Determine winners based on pot distribution or defaults
         if let distribution = hand.raw.pot.distribution {
+            // Use explicit pot distribution from hand history
             winningPlayers = Set(distribution.filter { $0.amount > 0 }.map { $0.playerName })
+            
+            print("DEBUG - Using explicit pot distribution: \(distribution.map { "\($0.playerName): $\($0.amount)" }.joined(separator: ", "))")
+            
+            // Log final hand rankings for all winners
+            for winner in distribution.filter({ $0.amount > 0 }) {
+                print("DEBUG - Winner \(winner.playerName) with hand: \(winner.hand)")
+            }
             
             // Animate pot distribution after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -362,16 +629,111 @@ struct HandReplayView: View {
                     for potDist in distribution {
                         if let currentStack = self.playerStacks[potDist.playerName] {
                             self.playerStacks[potDist.playerName] = currentStack + potDist.amount
+                            print("DEBUG - Distributing $\(potDist.amount) to \(potDist.playerName), new stack: $\(currentStack + potDist.amount)")
                         }
                     }
                     self.potAmount = 0
                 }
             }
+        } else {
+            // No distribution data, fallback to simple determination
+            print("DEBUG - No pot distribution data, using fallback winner determination")
+            
+            // If only one player is active (everyone else folded), they win
+            let activePlayers = hand.raw.players.filter { !foldedPlayers.contains($0.name) }
+            
+            if activePlayers.count == 1 {
+                // Single player wins the pot
+                let winner = activePlayers.first!
+                winningPlayers = [winner.name]
+                
+                print("DEBUG - Single active player: \(winner.name) wins by fold")
+                
+                // Animate winner getting pot
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                        showPotDistribution = true
+                        
+                        // Update winner stack
+                        if let currentStack = self.playerStacks[winner.name] {
+                            self.playerStacks[winner.name] = currentStack + self.potAmount
+                            print("DEBUG - Distributing $\(self.potAmount) to \(winner.name), new stack: $\(currentStack + self.potAmount)")
+                        }
+                        self.potAmount = 0
+                    }
+                }
+            } else if showdownRevealed {
+                // Try to determine winner based on Hero PnL
+                let heroPlayer = hand.raw.players.first { $0.isHero }
+                
+                if let hero = heroPlayer {
+                    let heroPnl = hand.raw.pot.heroPnl ?? 0
+                    if heroPnl > 0 {
+                        // Hero won
+                        winningPlayers = [hero.name]
+                        print("DEBUG - Hero won based on positive PnL: $\(heroPnl)")
+                    } else {
+                        // Villain(s) won - make all non-hero active players winners
+                        winningPlayers = Set(activePlayers.filter { !$0.isHero }.map { $0.name })
+                        print("DEBUG - Villains won based on negative hero PnL: $\(heroPnl)")
+                    }
+                    
+                    // Distribute pot (simplified)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            showPotDistribution = true
+                            
+                            if heroPnl > 0 {
+                                // Hero gets the pot
+                                if let currentStack = self.playerStacks[hero.name] {
+                                    self.playerStacks[hero.name] = currentStack + self.potAmount
+                                }
+                            } else {
+                                // Split pot among villains (or just one villain gets it)
+                                let villains = activePlayers.filter { !$0.isHero }
+                                if !villains.isEmpty {
+                                    let splitAmount = self.potAmount / Double(villains.count)
+                                    
+                                    for villain in villains {
+                                        if let currentStack = self.playerStacks[villain.name] {
+                                            self.playerStacks[villain.name] = currentStack + splitAmount
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            self.potAmount = 0
+                        }
+                    }
+                } else {
+                    // Can't determine winner, distribute randomly
+                    print("DEBUG - Cannot determine winner, using fallback equal distribution")
+                    
+                    winningPlayers = Set(activePlayers.map { $0.name })
+                    
+                    // Split pot equally
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            showPotDistribution = true
+                            
+                            if !activePlayers.isEmpty {
+                                let splitAmount = self.potAmount / Double(activePlayers.count)
+                                
+                                for player in activePlayers {
+                                    if let currentStack = self.playerStacks[player.name] {
+                                        self.playerStacks[player.name] = currentStack + splitAmount
+                                    }
+                                }
+                            }
+                            
+                            self.potAmount = 0
+                        }
+                    }
+                }
+            }
         }
         
         isHandComplete = true
-        
-        isShowdownComplete = true
     }
 }
 
@@ -379,37 +741,45 @@ struct CommunityCardsView: View {
     let cards: [String]
 
     var body: some View {
+        let cardWidth: CGFloat = 36
+        let cardHeight: CGFloat = 52
         VStack(spacing: 4) {
             // Flop, Turn, River label
             Text(getStreetLabel())
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
-                .padding(.bottom, 2)
+                .padding(.bottom, 3)
+                .shadow(color: .black.opacity(0.5), radius: 1)
             
-            // All cards in one row
-            HStack(spacing: 5) {
+            // All cards in one row with better spacing and shadow
+            HStack(spacing: 6) {
                 ForEach(0..<5) { idx in
                     if idx < cards.count {
                         CardView(card: Card(from: cards[idx]))
-                            .frame(width: 38, height: 52)
-                            .shadow(color: .black.opacity(0.6), radius: 1)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .shadow(color: .black.opacity(0.5), radius: 1.5)
                             .transition(.scale.combined(with: .opacity))
                             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: cards.count)
                     } else {
-                        // Empty placeholder
+                        // Empty placeholder - more visible
                         RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.clear)
-                            .frame(width: 38, height: 52)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(width: cardWidth, height: cardHeight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
                     }
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.1, green: 0.3, blue: 0.1))
-                .shadow(color: .black.opacity(0.5), radius: 2)
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.2))
+                .shadow(color: .black.opacity(0.3), radius: 2)
+                .padding(.horizontal, -4)
+                .padding(.vertical, -2)
         )
     }
     
@@ -428,19 +798,23 @@ struct CommunityCardsView: View {
 struct CardView: View {
     let card: Card
     
-    // Get color based on suit
+    // Get color based on suit - enhanced with better contrast
     private var cardBackgroundColor: Color {
         switch card.suit.lowercased() {
         case "s": return Color(red: 0.1, green: 0.2, blue: 0.5) // Spades - dark blue
-        case "h": return Color(red: 0.5, green: 0.1, blue: 0.1) // Hearts - dark red
-        case "d": return Color(red: 0.1, green: 0.4, blue: 0.6) // Diamonds - medium blue
-        case "c": return Color(red: 0.1, green: 0.3, blue: 0.2) // Clubs - dark green
+        case "h": return Color(red: 0.7, green: 0.1, blue: 0.1) // Hearts - brighter red
+        case "d": return Color(red: 0.1, green: 0.4, blue: 0.8) // Diamonds - brighter blue
+        case "c": return Color(red: 0.1, green: 0.4, blue: 0.2) // Clubs - brighter green
         default: return Color(red: 0.1, green: 0.25, blue: 0.5) // Default blue
         }
     }
     
     private var suitColor: Color {
-        card.suit.lowercased() == "h" || card.suit.lowercased() == "d" ? .red : .white
+        switch card.suit.lowercased() {
+        case "h", "d": return Color(red: 1.0, green: 0.2, blue: 0.2) // Bright red for hearts/diamonds
+        case "s", "c": return Color.white // White for spades/clubs
+        default: return .white
+        }
     }
     
     var body: some View {
@@ -450,30 +824,61 @@ struct CardView: View {
                 .fill(cardBackgroundColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(Color.black.opacity(0.5), lineWidth: 0.5)
+                        .stroke(Color.white.opacity(0.8), lineWidth: 1) // Brighter border
                 )
-                .shadow(color: .black.opacity(0.2), radius: 1)
+                .shadow(color: .black.opacity(0.3), radius: 1.5)
             
-            // Card content - simplified design matching image
-            VStack {
+            // Card content - improved layout
+            VStack(spacing: 0) {
                 // Top left - rank and suit
                 HStack {
                     VStack(alignment: .leading, spacing: -2) {
                         Text(formatRank(card.rank))
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 1) // Text shadow for better contrast
                         
                         Text(suitSymbol(for: card.suit))
-                            .font(.system(size: 14))
+                            .font(.system(size: 15)) // Slightly larger suit
                             .foregroundColor(suitColor)
+                            .shadow(color: .black.opacity(0.5), radius: 1) // Suit shadow for better contrast
                     }
-                    .padding(.leading, 4)
+                    .padding(.leading, 3)
                     .padding(.top, 2)
                     
                     Spacer()
                 }
                 
                 Spacer()
+                
+                // Center suit (larger)
+                Text(suitSymbol(for: card.suit))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(suitColor)
+                    .shadow(color: .black.opacity(0.5), radius: 1)
+                    .offset(y: -4) // Move up slightly
+                
+                Spacer()
+                
+                // Bottom right - rank and suit (smaller, inverted)
+                HStack {
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: -2) {
+                        Text(formatRank(card.rank))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 1)
+                        
+                        Text(suitSymbol(for: card.suit))
+                            .font(.system(size: 13))
+                            .foregroundColor(suitColor)
+                            .shadow(color: .black.opacity(0.5), radius: 1)
+                    }
+                    .padding(.trailing, 3)
+                    .padding(.bottom, 2)
+                    .rotationEffect(.degrees(180))
+                }
             }
         }
     }
@@ -519,125 +924,144 @@ struct PlayerSeatView: View {
         isHero ? "Hero" : (player.position ?? "")
     }
     
-    // Check if this player is on the button
+    // Check if this player is on the button (BTN position)
     private var isOnButton: Bool {
-        return player.position == "button"
+        return player.position == "BTN"
     }
     
-    private let positionOrder = [
-        "button",
-        "small blind",
-        "big blind",
-        "utg",
-        "utg+1",
-        "utg+2",
-        "lojack",
-        "hijack",
-        "cutoff"
-    ]
-    
+    private let positionOrder6Max = ["SB", "BB", "UTG", "MP", "CO", "BTN"]
+    private let positionOrder9Max = ["SB", "BB", "UTG", "UTG+1", "MP", "MP+1", "HJ", "CO", "BTN"]
+    private let positionOrder2Max = ["SB", "BB"]
+
     private func getPosition() -> CGPoint {
         let width = geometry.size.width
         let height = geometry.size.height
-        
-        guard let hero = allPlayers.first(where: { $0.isHero }),
-              let heroPosition = hero.position,
-              let heroIndex = positionOrder.firstIndex(of: heroPosition) else {
-            // fallback
-            return CGPoint(x: width * 0.5, y: height * 0.72)
+        let tableCenterX = width * 0.5
+        let tableCenterY = height * 0.4 // Center of the ellipse
+        let tableWidthRadius = width * 0.93 * 0.5 // Ellipse horizontal radius
+        let tableHeightRadius = height * 0.75 * 0.5 // Ellipse vertical radius
+
+        // Determine position order based on table size
+        let tableSize = allPlayers.count
+        let positionOrder: [String]
+        switch tableSize {
+            case 2: positionOrder = positionOrder2Max
+            case 3...6: positionOrder = positionOrder6Max // Assume 6max layout for intermediate sizes too
+            case 7...9: positionOrder = positionOrder9Max
+            default: positionOrder = positionOrder6Max // Default fallback
         }
         
-        guard let playerPosition = player.position,
-              let playerIndex = positionOrder.firstIndex(of: playerPosition) else {
-            // fallback
-            return CGPoint(x: width * 0.5, y: height * 0.72)
+        let numSeats = positionOrder.count // Use the count from the relevant order
+
+        let hero = allPlayers.first(where: { $0.isHero })
+        guard let hero = hero else {
+            print("Error: Hero player not found in allPlayers for HandReplayView layout.")
+            fatalError("Hero player required for layout but not found.") // Or handle more gracefully
+        }
+        let heroPos = hero.position // Now accessing the unwrapped hero
+        let heroSeatIndex = hero.seat - 1 // Now accessing the unwrapped hero
+
+        
+        let playerSeatIndex = player.seat - 1 // Use seat index (0-based)
+
+        // --- Angle Calculation --- 
+        // Calculate the angle step between seats
+        let angleStep = 360.0 / Double(numSeats)
+        
+        // Calculate the "natural" angle for the hero based on their seat index
+        // Assuming seat 1 (index 0) is roughly SB position (e.g., ~225 degrees from top)
+        // And seats increase clockwise.
+        // Let's refine: Assume seat 1 starts just left of bottom (Hero's spot)
+        let baseAngleOffset = -100.0 // Degrees offset from positive X-axis for seat 1
+        let heroNaturalAngle = baseAngleOffset + Double(heroSeatIndex) * angleStep
+        
+        // Calculate the desired angle for the hero (bottom center)
+        let heroTargetAngle = 80.0 // Moved hero slightly more up (smaller angle)
+        
+        // Calculate the rotation needed to move hero to the target angle
+        let rotationOffset = heroTargetAngle - heroNaturalAngle
+        
+        // Calculate the natural angle for the current player
+        let playerNaturalAngle = baseAngleOffset + Double(playerSeatIndex) * angleStep
+        
+        // Apply the rotation offset to the current player's angle
+        let playerFinalAngleDegrees = playerNaturalAngle + rotationOffset
+        let playerFinalAngleRadians = playerFinalAngleDegrees * .pi / 180.0
+        
+        // Calculate position on the ellipse using the final angle
+        let x = tableCenterX + tableWidthRadius * cos(playerFinalAngleRadians)
+        
+        // Calculate base y position
+        var y = tableCenterY + tableHeightRadius * sin(playerFinalAngleRadians)
+        
+        // Move hero up a bit more if this is the hero player
+        if isHero {
+            y -= 15  // Move hero up by 15 points
         }
         
-        // Calculate relative position (clockwise)
-        let relativeIndex = (playerIndex - heroIndex + positionOrder.count) % positionOrder.count
-        let tablePositions = [
-            CGPoint(x: width * 0.5, y: height * 0.72),  // 0: Hero (bottom center)
-            CGPoint(x: width * 0.12, y: height * 0.62),  // 1: Bottom left
-            CGPoint(x: width * 0.08, y: height * 0.4),   // 2: Left middle
-            CGPoint(x: width * 0.12, y: height * 0.2),   // 3: Left top
-            CGPoint(x: width * 0.3, y: height * 0.05),   // 4: Top middle left
-            CGPoint(x: width * 0.7, y: height * 0.05),   // 5: Top middle right
-            CGPoint(x: width * 0.88, y: height * 0.2),   // 6: Right top
-            CGPoint(x: width * 0.92, y: height * 0.4),   // 7: Right middle
-            CGPoint(x: width * 0.88, y: height * 0.62),  // 8: Bottom right
-        ]
-        let pos = tablePositions[relativeIndex]
-        
-        return pos
+        return CGPoint(x: x, y: y)
     }
     
     private func getBetPosition() -> CGPoint {
         let width = geometry.size.width
         let height = geometry.size.height
-        let centerX = width * 0.5
-        let centerY = height * 0.4 // Adjusted center of the table
-        
-        // Get the player's current position
-        let pos = getPosition()
-        
+
         // Calculate vector from center to player position
-        let vectorX = pos.x - centerX
-        let vectorY = pos.y - centerY
+        let pos = getPosition()
+        let tableCenterY = height * 0.4
+        let vectorX = pos.x - (width * 0.5)
+        let vectorY = pos.y - tableCenterY
         
-        // Normalize the vector
+        // Only normalize if the vector has length
         let length = sqrt(vectorX * vectorX + vectorY * vectorY)
-        let normalizedX = vectorX / length
-        let normalizedY = vectorY / length
-        
-        // Special positioning for different seat positions
+        let normalizedVectorX = length > 0 ? vectorX / length : 0
+        let normalizedVectorY = length > 0 ? vectorY / length : -1 // Default point up if zero vector
+
+        // Use different scaling factors for different players to avoid overlap
+        let scaleFactor: CGFloat
         if isHero {
-            // For hero, place bet to the right side
-            return CGPoint(x: pos.x + 85, y: pos.y)
-        } else if player.position == "small blind" {
-            // For small blind on the left, place bet to the right to avoid overlap
-            return CGPoint(x: pos.x + 65, y: pos.y)
-        } else if player.position == "big blind" {
-            // For big blind, place bet to the right
-            return CGPoint(x: pos.x + 65, y: pos.y + 10)
-        } else if player.position == "cutoff" {
-            // For cutoff on the right, place bet to the left
-            return CGPoint(x: pos.x - 65, y: pos.y)
-        } else if ["hijack", "lojack"].contains(player.position) {
-            // Right side positions
-            return CGPoint(x: pos.x - 65, y: pos.y + 10)
-        } else if ["utg", "utg+1", "utg+2"].contains(player.position) {
-            // Left side positions
-            return CGPoint(x: pos.x + 65, y: pos.y + 10)
+            scaleFactor = 50 // Smaller distance for hero
         } else {
-            // For positions at the top of the table, place bets below
-            return CGPoint(x: pos.x, y: pos.y + 55)
+            // Scale distance based on position around table to avoid overlap
+            scaleFactor = 70 // Larger distance for others
         }
+        
+        let offsetX = normalizedVectorX * -scaleFactor
+        let offsetY = normalizedVectorY * -scaleFactor
+        
+        // Add a small random offset to avoid exact overlaps when bets are the same
+        let jitter = CGFloat(player.seat % 3) * 5.0 // Small offset based on seat number
+        let jitterX = jitter * normalizedVectorY // Perpendicular to the vector
+        let jitterY = -jitter * normalizedVectorX
+
+        return CGPoint(x: pos.x + offsetX + jitterX, y: pos.y + offsetY + jitterY)
     }
     
-    // Position for the dealer button
+    // Position for the dealer button - needs adjustment based on new getPosition
     private func getDealerButtonPosition() -> CGPoint {
         let position = getPosition()
+        let width = geometry.size.width
+        let height = geometry.size.height
+        let tableCenterY = height * 0.4
         
-        // Position the dealer button based on seat location
-        if isHero {
-            // Bottom center - place button to the left
-            return CGPoint(x: position.x - 55, y: position.y - 2)
-        } else if player.position == "small blind" {
-            // Bottom left - place button to the right
-            return CGPoint(x: position.x + 45, y: position.y - 7)
-        } else if player.position == "cutoff" {
-            // Bottom right - place button to the left
-            return CGPoint(x: position.x - 45, y: position.y - 7)
-        } else if ["hijack", "lojack"].contains(player.position) {
-            // Right side - place button to the left
-            return CGPoint(x: position.x - 45, y: position.y - 2)
-        } else if ["utg", "utg+1", "utg+2"].contains(player.position) {
-            // Left side - place button to the right
-            return CGPoint(x: position.x + 45, y: position.y - 2)
-        } else {
-            // Top - place button below
-            return CGPoint(x: position.x, y: position.y + 35)
-        }
+        // Calculate vector from center to player position
+        let vectorX = position.x - (width * 0.5)
+        let vectorY = position.y - tableCenterY
+        let length = sqrt(vectorX * vectorX + vectorY * vectorY)
+        
+        // Only use normalized vector if length is non-zero
+        let normalizedVectorX = length > 0 ? vectorX / length : 0
+        let normalizedVectorY = length > 0 ? vectorY / length : -1
+        
+        let perpendicularOffsetX = (normalizedVectorY) * 25
+        let perpendicularOffsetY = (-normalizedVectorX) * 25
+        
+        // Further offset based on general location (e.g., push slightly out)
+        let outwardOffsetX = normalizedVectorX * 10
+        let outwardOffsetY = normalizedVectorY * 10
+
+        return CGPoint(x: position.x + perpendicularOffsetX + outwardOffsetX, 
+                       y: position.y + perpendicularOffsetY + outwardOffsetY)
     }
     
     private var shouldShowCards: Bool {
@@ -657,44 +1081,54 @@ struct PlayerSeatView: View {
             return true
         }
         
-        // For villains, ONLY show cards at showdown when we've actually completed all actions
-        if !isFolded && isShowdownComplete {
+        // For villains, ONLY show cards when the showdown is complete
+        if !isHero && !isFolded && isShowdownComplete {
             return true
         }
         
+        // Otherwise, keep cards hidden
         return false
     }
     
     var body: some View {
+        let cardWidth: CGFloat = 36
+        let cardHeight: CGFloat = 52
         let position = getPosition()
         let betPosition = getBetPosition()
         
-        let cardWidth: CGFloat = isHero ? 38 : 28
-        let cardHeight: CGFloat = isHero ? 56 : 40
-        let rectWidth: CGFloat = isHero ? 100 : 70
-        let rectHeight: CGFloat = isHero ? 54 : 36
-        let fontSize: CGFloat = isHero ? 17 : 13
-        let stackFontSize: CGFloat = isHero ? 15 : 11
-        let cardOffset: CGFloat = isHero ? -38 : -28
+        // Use standard poker card size for all cards
+        let rectWidth: CGFloat = isHero ? 110 : 80
+        let rectHeight: CGFloat = isHero ? 60 : 40
+        let fontSize: CGFloat = isHero ? 17 : 14
+        let stackFontSize: CGFloat = isHero ? 15 : 12
+        let cardOffset: CGFloat = isHero ? -44 : -36
         
         ZStack {
             // Main content in a separate ZStack for proper layering
             ZStack {
                 // Cards first (will be behind player info but above table)
                 if shouldShowCards {
-                    HStack(spacing: isHero ? 12 : 7) {
-                        ForEach(0..<2, id: \.self) { index in
+                    HStack(spacing: 8) {
+                        ForEach(0..<2, id: \ .self) { index in
                             if shouldRevealCardValues {
-                                // At showdown, show finalCards if available, otherwise fall back to regular cards
                                 if showdownRevealed && player.finalCards != nil && index < player.finalCards!.count {
                                     CardView(card: Card(from: player.finalCards![index]))
                                         .frame(width: cardWidth, height: cardHeight)
+                                        .shadow(color: .black.opacity(0.7), radius: 1, x: 0, y: 1)
                                 } else if let cards = player.cards, index < cards.count {
                                     CardView(card: Card(from: cards[index]))
                                         .frame(width: cardWidth, height: cardHeight)
+                                        .shadow(color: .black.opacity(0.7), radius: 1, x: 0, y: 1)
+                                } else {
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: cardWidth, height: cardHeight)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 5)
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
                                 }
                             } else {
-                                // Otherwise show a blank card
                                 ZStack {
                                     RoundedRectangle(cornerRadius: isHero ? 7 : 5)
                                         .fill(Color.gray)
@@ -707,13 +1141,13 @@ struct PlayerSeatView: View {
                             }
                         }
                     }
-                    .offset(y: isHero ? -32 : cardOffset)
+                    .offset(y: cardOffset)
                     .zIndex(1)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: showCards)
                 }
                 
-                // Player info rectangle on top
+                // Player info rectangle on top -> Now just player info text
                 VStack(spacing: isHero ? 4 : 4) {
                     ZStack {
                         if showCheck {
@@ -746,7 +1180,7 @@ struct PlayerSeatView: View {
                 )
                 .scaleEffect(isWinner && showPotDistribution ? 1.1 : 1.0)
                 .animation(.spring(response: 0.3), value: isWinner && showPotDistribution)
-                .zIndex(2)  // Highest z-index for player info
+                .zIndex(2)  // Keep info on top
                 .opacity(isFolded ? 0.5 : 1.0)
             }
             .position(x: position.x, y: position.y)
@@ -762,7 +1196,7 @@ struct PlayerSeatView: View {
             // Bet amount in separate layer
             if let bet = betAmount, bet > 0 {
                 ChipView(amount: bet)
-                    .scaleEffect(isHero ? 1.0 : 0.8) // Larger chips for hero
+                    .scaleEffect(isHero ? 1.1 : 0.9) // Slightly larger chips overall 
                     .position(x: betPosition.x, y: betPosition.y)
                     .transition(.scale.combined(with: .opacity))
                     .animation(.spring(response: 0.3), value: bet)
@@ -972,6 +1406,40 @@ struct ShareHandView: View {
         }
     }
     
+    private var handResult: String {
+        // Determine the outcome of the hand for a concise description
+        if let showdown = hand.raw.showdown, showdown {
+            if let distribution = hand.raw.pot.distribution, !distribution.isEmpty {
+                // Find if hero won the showdown
+                let heroWon = distribution.contains(where: { 
+                    $0.amount > 0 && $0.playerName == heroName
+                })
+                
+                if heroWon {
+                    if let heroWinner = distribution.first(where: { $0.playerName == heroName }) {
+                        return "Won at showdown with \(heroWinner.hand)"
+                    } else {
+                        return "Won at showdown"
+                    }
+                } else {
+                    return "Lost at showdown"
+                }
+            } else {
+                // No distribution data - use PnL to determine
+                return heroPnl > 0 ? "Won at showdown" : "Lost at showdown"
+            }
+        } else {
+            // No showdown
+            return heroPnl > 0 ? "Won, all opponents folded" : "Folded"
+        }
+    }
+    
+    private var gameDetails: String {
+        let stakes = "\(Int(hand.raw.gameInfo.smallBlind))/\(Int(hand.raw.gameInfo.bigBlind))"
+        let tableSize = "\(hand.raw.gameInfo.tableSize)-max"
+        return "$\(stakes) \(tableSize)"
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -1027,23 +1495,55 @@ struct ShareHandView: View {
                     
                     // Hand Summary
                     VStack(alignment: .leading, spacing: 12) {
+                        // Game info and P&L in the same row
+                        HStack {
+                            Text(gameDetails)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Spacer()
+                            
+                            Text("P/L: \(formattedPnl)")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(heroPnl >= 0 ? .green : .red)
+                        }
+                        
+                        // Hero's cards
                         if let hero = hand.raw.players.first(where: { $0.isHero }) {
                             HStack(spacing: 8) {
                                 ForEach(hero.cards ?? [], id: \.self) { card in
                                     CardView(card: Card(from: card))
                                         .frame(width: 32, height: 46)
                                 }
+                                
+                                Spacer()
+                                
+                                // Hand result right-aligned
+                                Text(handResult)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(heroPnl >= 0 ? .green : .white.opacity(0.8))
                             }
-                            
-                            if let finalHand = hero.finalHand {
-                                Text("Best Hand: \(finalHand)")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
+                        }
+                        
+                        // Community cards if any
+                        let allCards = hand.raw.streets.flatMap { $0.cards }
+                        if !allCards.isEmpty {
+                            HStack(spacing: 4) {
+                                Text("Board:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                
+                                ForEach(allCards, id: \.self) { card in
+                                    CardView(card: Card(from: card))
+                                        .frame(width: 24, height: 34)
+                                }
                             }
-                            
-                            Text("P/L: \(formattedPnl)")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(heroPnl >= 0 ? .green : .red)
+                        }
+                        
+                        if let finalHand = hand.raw.players.first(where: { $0.isHero })?.finalHand {
+                            Text(finalHand)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                     }
                     .padding()
@@ -1060,6 +1560,20 @@ struct ShareHandView: View {
                         .padding()
                         .background(Color.clear)
                         .scrollContentBackground(.hidden)
+                    
+                    // Default post text suggestion
+                    if postText.isEmpty {
+                        Text(getDefaultPostText())
+                            .foregroundColor(.gray)
+                            .font(.system(size: 16))
+                            .padding(.horizontal)
+                            .padding(.top, 24)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onTapGesture {
+                                postText = getDefaultPostText()
+                                isTextEditorFocused = true
+                            }
+                    }
                     
                     // Bottom toolbar
                     HStack {
@@ -1099,6 +1613,30 @@ struct ShareHandView: View {
         }
         .onAppear {
             isTextEditorFocused = true
+        }
+    }
+    
+    // Generate a default post text based on the hand outcome
+    private func getDefaultPostText() -> String {
+        let stakes = "$\(Int(hand.raw.gameInfo.smallBlind))/\(Int(hand.raw.gameInfo.bigBlind))"
+        
+        if heroPnl > 0 {
+            if let hero = hand.raw.players.first(where: { $0.isHero }),
+               let cards = hero.cards,
+               cards.count >= 2,
+               let distribution = hand.raw.pot.distribution,
+               let heroWinner = distribution.first(where: { $0.playerName == hero.name }) {
+                
+                return "Just won \(formattedPnl) at \(stakes) with \(heroWinner.hand)! 🎯 \(cards[0])\(cards[1])"
+            } else {
+                return "Nice win of \(formattedPnl) at \(stakes)! 💰"
+            }
+        } else {
+            if let hero = hand.raw.players.first(where: { $0.isHero }), let cards = hero.cards, cards.count >= 2 {
+                return "Tough spot with \(cards[0])\(cards[1]) - lost \(formattedPnl) at \(stakes). 😔"
+            } else {
+                return "Tough hand at \(stakes) - lost \(formattedPnl). 🤔"
+            }
         }
     }
     

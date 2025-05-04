@@ -372,10 +372,15 @@ struct PlusIcon: View {
 // Break out the title view
 struct HandTitleView: View {
     var body: some View {
-        Text("Add Poker Hand")
-            .font(.system(size: 28, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.top, 12)
+        HStack {
+            Text("Add Hand History")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
     }
 }
 
@@ -515,142 +520,20 @@ struct ParseSuccessView: View {
     }
 }
 
-// Simplified AddHandView that uses the components
+// Simplified AddHandView that uses manual entry instead of parsing
 struct AddHandView: View {
     let userId: String
     var onDismiss: () -> Void
     @Environment(\.dismiss) var dismiss
-    @StateObject private var handStore = HandStore(userId: "")
-    @State private var handText = ""
-    @State private var isLoading = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var parsedHand: ParsedHandHistory?
-    @State private var showingSuccess = false
-    @FocusState private var isFocused: Bool
 
     init(userId: String, onDismiss: @escaping () -> Void) {
         self.userId = userId
         self.onDismiss = onDismiss
-        _handStore = StateObject(wrappedValue: HandStore(userId: userId))
     }
 
     var body: some View {
-        ZStack {
-            AppBackgroundView()
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                HandTitleView()
-                
-                VStack(spacing: 16) {
-                    HandTextEditorView(text: $handText, isFocused: $isFocused)
-                    
-                    ParseButtonView(
-                        isLoading: isLoading,
-                        isEmpty: handText.isEmpty,
-                        action: parseHand
-                    )
-                }
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(red: 0.12, green: 0.12, blue: 0.1))
-                        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 10)
-                )
-                .padding(.horizontal, 16)
-                
-                if let parsedHand = parsedHand {
-                    ParseSuccessView(parsedHand: parsedHand)
-                }
-                
-                Spacer()
-                
-                // Close button
-                Button(action: { onDismiss(); dismiss() }) {
-                    Circle()
-                        .fill(Color(red: 0.15, green: 0.15, blue: 0.18))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Image(systemName: "xmark")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                        )
-                        .shadow(color: .black.opacity(0.3), radius: 8)
-                }
-                .padding(.bottom, 16)
-            }
-            .padding(.top, 10)
-        }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-
-    private func parseHand() {
-        isLoading = true
-        Task {
-            do {
-                let parsed = try await HandParserService.shared.parseHand(description: handText)
-                self.parsedHand = parsed
-                
-                // Show verification view instead of immediately saving
-                DispatchQueue.main.async {
-                    showingSuccess = true
-                    self.showVerificationView(originalText: handText, parsedHand: parsed)
-                }
-            } catch let error as HandParserError {
-                errorMessage = error.message
-                showingError = true
-            } catch {
-                errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
-                showingError = true
-            }
-            isLoading = false
-        }
-    }
-    
-    private func showVerificationView(originalText: String, parsedHand: ParsedHandHistory) {
-        // Create and present the verification view
-        let verificationView = HandVerificationView(
-            originalText: originalText,
-            parsedHand: parsedHand, 
-            onComplete: { result in
-                if result {
-                    // Save the hand if verification was successful
-                    Task {
-                        try? await handStore.saveHand(parsedHand)
-                        DispatchQueue.main.async {
-                            onDismiss()
-                            dismiss()
-                        }
-                    }
-                } else {
-                    // Just dismiss if canceled
-                    DispatchQueue.main.async {
-                        onDismiss()
-                        dismiss()
-                    }
-                }
-            }
-        )
-        
-        // Present the verification view as a sheet using modern API
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else {
-            return
-        }
-        
-        // Get the topmost presented controller
-        var topController = rootVC
-        while let presented = topController.presentedViewController {
-            topController = presented
-        }
-        
-        let hostingController = UIHostingController(rootView: verificationView)
-        topController.present(hostingController, animated: true)
+        // Present the Wizard, not the old single view
+        ManualHandEntryWizardView()
     }
 }
 
@@ -942,5 +825,80 @@ struct ProfileEditView: View {
     }
 }
 
-// Remove the entire AddMenuOverlay struct definition
-// struct AddMenuOverlay: View { ... } 
+
+struct AddMenuOverlay: View {
+    @Binding var showingMenu: Bool
+    let userId: String
+    @State private var showHandInput = false
+    @Binding var showSessionForm: Bool
+
+    var body: some View {
+        ZStack {
+            // Dim overlay to darken screen outside the menu
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation { showingMenu = false }
+                }
+            
+            // Actual menu content
+            GeometryReader { geo in
+                VStack {
+                    Spacer()
+                    VStack(spacing: 32) {
+                        SleekMenuButton(
+                            icon: "clock.arrow.circlepath",
+                            title: "Past Session",
+                            action: {
+                                withAnimation(nil) {
+                                    showSessionForm = true
+                                    showingMenu = false
+                                }
+                            }
+                        )
+                        SleekMenuButton(
+                            icon: "clock",
+                            title: "Live Session",
+                            action: { showingMenu = false }
+                        )
+                        SleekMenuButton(
+                            icon: "doc.text",
+                            title: "Add Hand",
+                            action: { showHandInput = true }
+                        )
+                        
+                        // Spacer to push content up
+                        Spacer()
+                            .frame(height: geo.size.height * 0.15)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
+            }
+            
+            // Invisible button directly over the + button to handle taps
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        withAnimation { showingMenu = false }
+                    }) {
+                        Color.clear
+                            .frame(width: 70, height: 70)
+                    }
+                    Spacer()
+                }
+                .padding(.bottom, 20)
+            }
+        }
+        .transition(.opacity)
+        .sheet(isPresented: $showHandInput) {
+            ManualHandEntryWizardView()
+                .onDisappear {
+                    showHandInput = false
+                    showingMenu = false
+                }
+        }
+    }
+} 
+
