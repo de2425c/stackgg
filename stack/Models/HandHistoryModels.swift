@@ -10,10 +10,12 @@ struct RawHandHistory: Codable {
     let players: [Player]
     let streets: [Street]
     let pot: Pot
+    let showdown: Bool?
     
     enum CodingKeys: String, CodingKey {
         case gameInfo = "game_info"
         case players, streets, pot
+        case showdown
     }
 }
 

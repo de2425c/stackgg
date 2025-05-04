@@ -195,7 +195,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: updatedGameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -221,7 +222,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: updatedGameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -247,7 +249,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: updatedGameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -273,7 +276,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: updatedGameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -299,7 +303,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: hand.raw.gameInfo,
                                     players: newPlayers,
                                     streets: hand.raw.streets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -325,7 +330,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: hand.raw.gameInfo,
                                     players: hand.raw.players,
                                     streets: newStreets,
-                                    pot: hand.raw.pot
+                                    pot: hand.raw.pot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -355,7 +361,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: hand.raw.gameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: updatedPot
+                                    pot: updatedPot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -380,7 +387,8 @@ struct HandSummaryDisplay: View {
                                     gameInfo: hand.raw.gameInfo,
                                     players: hand.raw.players,
                                     streets: hand.raw.streets,
-                                    pot: updatedPot
+                                    pot: updatedPot,
+                                    showdown: hand.raw.showdown
                                 )
                                 
                                 // Update the hand with the new RawHandHistory
@@ -415,7 +423,8 @@ struct HandSummaryDisplay: View {
                                         gameInfo: hand.raw.gameInfo,
                                         players: hand.raw.players,
                                         streets: hand.raw.streets,
-                                        pot: updatedPot
+                                        pot: updatedPot,
+                                        showdown: hand.raw.showdown
                                     )
                                     
                                     // Update the hand with the new RawHandHistory
