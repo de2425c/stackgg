@@ -183,7 +183,8 @@ struct HandSummaryView: View {
                     HStack(spacing: 4) {
                         ForEach(cards, id: \.self) { card in
                             CardView(card: Card(from: card))
-                                .frame(width: 36, height: 50)
+                                .aspectRatio(0.69, contentMode: .fit)
+                                .frame(width: 36, height: 52)
                                 .shadow(color: .black.opacity(0.2), radius: 2)
                         }
                     }

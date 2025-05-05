@@ -46,9 +46,10 @@ struct HandReplayView: View {
     private let tableColor = Color(red: 45/255, green: 120/255, blue: 65/255)
     private let tableBorderColor = Color(red: 74/255, green: 54/255, blue: 38/255)
     
-    // Use standard card size for all cards
+    // Use standard card size for all cards with proper aspect ratio
+    private let cardAspectRatio: CGFloat = 0.69 // Standard playing card ratio (width to height)
     let cardWidth: CGFloat = 36
-    let cardHeight: CGFloat = 52
+    var cardHeight: CGFloat { return cardWidth / cardAspectRatio }
     
     private var hasMoreActions: Bool {
         guard currentStreetIndex < hand.raw.streets.count else { return false }
@@ -739,7 +740,7 @@ struct HandReplayView: View {
 
 struct CommunityCardsView: View {
     let cards: [String]
-
+    
     var body: some View {
         let cardWidth: CGFloat = 36
         let cardHeight: CGFloat = 52
@@ -756,6 +757,7 @@ struct CommunityCardsView: View {
                 ForEach(0..<5) { idx in
                     if idx < cards.count {
                         CardView(card: Card(from: cards[idx]))
+                            .aspectRatio(0.69, contentMode: .fit)
                             .frame(width: cardWidth, height: cardHeight)
                             .shadow(color: .black.opacity(0.5), radius: 1.5)
                             .transition(.scale.combined(with: .opacity))
@@ -764,6 +766,7 @@ struct CommunityCardsView: View {
                         // Empty placeholder - more visible
                         RoundedRectangle(cornerRadius: 5)
                             .fill(Color.gray.opacity(0.15))
+                            .aspectRatio(0.69, contentMode: .fit)
                             .frame(width: cardWidth, height: cardHeight)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 5)
@@ -773,14 +776,6 @@ struct CommunityCardsView: View {
                 }
             }
         }
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.black.opacity(0.2))
-                .shadow(color: .black.opacity(0.3), radius: 2)
-                .padding(.horizontal, -4)
-                .padding(.vertical, -2)
-        )
     }
     
     // Get label for current street
@@ -798,23 +793,19 @@ struct CommunityCardsView: View {
 struct CardView: View {
     let card: Card
     
-    // Get color based on suit - enhanced with better contrast
+    // Get color based on suit
     private var cardBackgroundColor: Color {
         switch card.suit.lowercased() {
         case "s": return Color(red: 0.1, green: 0.2, blue: 0.5) // Spades - dark blue
-        case "h": return Color(red: 0.7, green: 0.1, blue: 0.1) // Hearts - brighter red
-        case "d": return Color(red: 0.1, green: 0.4, blue: 0.8) // Diamonds - brighter blue
-        case "c": return Color(red: 0.1, green: 0.4, blue: 0.2) // Clubs - brighter green
+        case "h": return Color(red: 0.5, green: 0.1, blue: 0.1) // Hearts - dark red
+        case "d": return Color(red: 0.1, green: 0.4, blue: 0.6) // Diamonds - medium blue
+        case "c": return Color(red: 0.1, green: 0.3, blue: 0.2) // Clubs - dark green
         default: return Color(red: 0.1, green: 0.25, blue: 0.5) // Default blue
         }
     }
     
     private var suitColor: Color {
-        switch card.suit.lowercased() {
-        case "h", "d": return Color(red: 1.0, green: 0.2, blue: 0.2) // Bright red for hearts/diamonds
-        case "s", "c": return Color.white // White for spades/clubs
-        default: return .white
-        }
+        card.suit.lowercased() == "h" || card.suit.lowercased() == "d" ? .red : .white
     }
     
     var body: some View {
@@ -824,61 +815,30 @@ struct CardView: View {
                 .fill(cardBackgroundColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(Color.white.opacity(0.8), lineWidth: 1) // Brighter border
+                        .stroke(Color.black.opacity(0.5), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.3), radius: 1.5)
+                .shadow(color: .black.opacity(0.2), radius: 1)
             
-            // Card content - improved layout
-            VStack(spacing: 0) {
+            // Card content - simplified design matching image
+            VStack {
                 // Top left - rank and suit
                 HStack {
                     VStack(alignment: .leading, spacing: -2) {
                         Text(formatRank(card.rank))
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.5), radius: 1) // Text shadow for better contrast
                         
                         Text(suitSymbol(for: card.suit))
-                            .font(.system(size: 15)) // Slightly larger suit
+                            .font(.system(size: 14))
                             .foregroundColor(suitColor)
-                            .shadow(color: .black.opacity(0.5), radius: 1) // Suit shadow for better contrast
                     }
-                    .padding(.leading, 3)
+                    .padding(.leading, 4)
                     .padding(.top, 2)
                     
                     Spacer()
                 }
                 
                 Spacer()
-                
-                // Center suit (larger)
-                Text(suitSymbol(for: card.suit))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(suitColor)
-                    .shadow(color: .black.opacity(0.5), radius: 1)
-                    .offset(y: -4) // Move up slightly
-                
-                Spacer()
-                
-                // Bottom right - rank and suit (smaller, inverted)
-                HStack {
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: -2) {
-                        Text(formatRank(card.rank))
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.5), radius: 1)
-                        
-                        Text(suitSymbol(for: card.suit))
-                            .font(.system(size: 13))
-                            .foregroundColor(suitColor)
-                            .shadow(color: .black.opacity(0.5), radius: 1)
-                    }
-                    .padding(.trailing, 3)
-                    .padding(.bottom, 2)
-                    .rotationEffect(.degrees(180))
-                }
             }
         }
     }
@@ -901,6 +861,7 @@ struct CardView: View {
         }
     }
 }
+
 
 struct PlayerSeatView: View {
     let player: Player
@@ -938,8 +899,8 @@ struct PlayerSeatView: View {
         let height = geometry.size.height
         let tableCenterX = width * 0.5
         let tableCenterY = height * 0.4 // Center of the ellipse
-        let tableWidthRadius = width * 0.93 * 0.5 // Ellipse horizontal radius
-        let tableHeightRadius = height * 0.75 * 0.5 // Ellipse vertical radius
+        let tableWidthRadius = width * 0.93 * 0.5 * 0.9 // Condense horizontally
+        let tableHeightRadius = height * 0.75 * 0.5 * 0.9 // Condense vertically
 
         // Determine position order based on table size
         let tableSize = allPlayers.count
@@ -1018,17 +979,16 @@ struct PlayerSeatView: View {
         let normalizedVectorY = length > 0 ? vectorY / length : -1 // Default point up if zero vector
 
         // Use different scaling factors for different players to avoid overlap
-        let scaleFactor: CGFloat
+        let scaleFactor: CGFloat = isHero ? 50 : 70
+        var offsetX = normalizedVectorX * -scaleFactor
+        var offsetY = normalizedVectorY * -scaleFactor
+
+        // For hero, place bet to the right (screen right)
         if isHero {
-            scaleFactor = 50 // Smaller distance for hero
-        } else {
-            // Scale distance based on position around table to avoid overlap
-            scaleFactor = 70 // Larger distance for others
+            offsetX = 60 // Move bet chip to the hero's right (screen right)
+            offsetY = 0
         }
-        
-        let offsetX = normalizedVectorX * -scaleFactor
-        let offsetY = normalizedVectorY * -scaleFactor
-        
+
         // Add a small random offset to avoid exact overlaps when bets are the same
         let jitter = CGFloat(player.seat % 3) * 5.0 // Small offset based on seat number
         let jitterX = jitter * normalizedVectorY // Perpendicular to the vector
@@ -1092,7 +1052,7 @@ struct PlayerSeatView: View {
     
     var body: some View {
         let cardWidth: CGFloat = 36
-        let cardHeight: CGFloat = 52
+        let cardHeight: CGFloat = cardWidth / 0.69 // Maintain consistent aspect ratio
         let position = getPosition()
         let betPosition = getBetPosition()
         
@@ -1113,15 +1073,18 @@ struct PlayerSeatView: View {
                             if shouldRevealCardValues {
                                 if showdownRevealed && player.finalCards != nil && index < player.finalCards!.count {
                                     CardView(card: Card(from: player.finalCards![index]))
+                                        .aspectRatio(0.69, contentMode: .fit)
                                         .frame(width: cardWidth, height: cardHeight)
                                         .shadow(color: .black.opacity(0.7), radius: 1, x: 0, y: 1)
                                 } else if let cards = player.cards, index < cards.count {
                                     CardView(card: Card(from: cards[index]))
+                                        .aspectRatio(0.69, contentMode: .fit)
                                         .frame(width: cardWidth, height: cardHeight)
                                         .shadow(color: .black.opacity(0.7), radius: 1, x: 0, y: 1)
                                 } else {
                                     RoundedRectangle(cornerRadius: 5)
                                         .fill(Color.gray.opacity(0.3))
+                                        .aspectRatio(0.69, contentMode: .fit)
                                         .frame(width: cardWidth, height: cardHeight)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 5)
@@ -1132,6 +1095,7 @@ struct PlayerSeatView: View {
                                 ZStack {
                                     RoundedRectangle(cornerRadius: isHero ? 7 : 5)
                                         .fill(Color.gray)
+                                        .aspectRatio(0.69, contentMode: .fit)
                                         .frame(width: cardWidth, height: cardHeight)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: isHero ? 7 : 5)
@@ -1389,6 +1353,7 @@ struct ShareHandView: View {
     @State private var isLoading = false
     @FocusState private var isTextEditorFocused: Bool
     @Binding var showingReplay: Bool
+    @State private var isSharing = false
     
     private var heroName: String? {
         hand.raw.players.first(where: { $0.isHero })?.name
@@ -1494,62 +1459,8 @@ struct ShareHandView: View {
                     .padding()
                     
                     // Hand Summary
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Game info and P&L in the same row
-                        HStack {
-                            Text(gameDetails)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            Spacer()
-                            
-                            Text("P/L: \(formattedPnl)")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(heroPnl >= 0 ? .green : .red)
-                        }
-                        
-                        // Hero's cards
-                        if let hero = hand.raw.players.first(where: { $0.isHero }) {
-                            HStack(spacing: 8) {
-                                ForEach(hero.cards ?? [], id: \.self) { card in
-                                    CardView(card: Card(from: card))
-                                        .frame(width: 32, height: 46)
-                                }
-                                
-                                Spacer()
-                                
-                                // Hand result right-aligned
-                                Text(handResult)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(heroPnl >= 0 ? .green : .white.opacity(0.8))
-                            }
-                        }
-                        
-                        // Community cards if any
-                        let allCards = hand.raw.streets.flatMap { $0.cards }
-                        if !allCards.isEmpty {
-                            HStack(spacing: 4) {
-                                Text("Board:")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.gray)
-                                
-                                ForEach(allCards, id: \.self) { card in
-                                    CardView(card: Card(from: card))
-                                        .frame(width: 24, height: 34)
-                                }
-                            }
-                        }
-                        
-                        if let finalHand = hand.raw.players.first(where: { $0.isHero })?.finalHand {
-                            Text(finalHand)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-                    }
-                    .padding()
-                    .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.5)))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
+                    HandSummaryView(hand: hand)
+                        .padding(.horizontal)
                     
                     // Text Editor
                     TextEditor(text: $postText)
@@ -1562,18 +1473,8 @@ struct ShareHandView: View {
                         .scrollContentBackground(.hidden)
                     
                     // Default post text suggestion
-                    if postText.isEmpty {
-                        Text(getDefaultPostText())
-                            .foregroundColor(.gray)
-                            .font(.system(size: 16))
-                            .padding(.horizontal)
-                            .padding(.top, 24)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .onTapGesture {
-                                postText = getDefaultPostText()
-                                isTextEditorFocused = true
-                            }
-                    }
+
+                    
                     
                     // Bottom toolbar
                     HStack {
@@ -1617,28 +1518,7 @@ struct ShareHandView: View {
     }
     
     // Generate a default post text based on the hand outcome
-    private func getDefaultPostText() -> String {
-        let stakes = "$\(Int(hand.raw.gameInfo.smallBlind))/\(Int(hand.raw.gameInfo.bigBlind))"
-        
-        if heroPnl > 0 {
-            if let hero = hand.raw.players.first(where: { $0.isHero }),
-               let cards = hero.cards,
-               cards.count >= 2,
-               let distribution = hand.raw.pot.distribution,
-               let heroWinner = distribution.first(where: { $0.playerName == hero.name }) {
-                
-                return "Just won \(formattedPnl) at \(stakes) with \(heroWinner.hand)! 🎯 \(cards[0])\(cards[1])"
-            } else {
-                return "Nice win of \(formattedPnl) at \(stakes)! 💰"
-            }
-        } else {
-            if let hero = hand.raw.players.first(where: { $0.isHero }), let cards = hero.cards, cards.count >= 2 {
-                return "Tough spot with \(cards[0])\(cards[1]) - lost \(formattedPnl) at \(stakes). 😔"
-            } else {
-                return "Tough hand at \(stakes) - lost \(formattedPnl). 🤔"
-            }
-        }
-    }
+
     
     private func shareHand() {
         guard !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -1662,35 +1542,15 @@ struct ShareHandView: View {
                 )
                 try await postService.fetchPosts()
                 DispatchQueue.main.async {
-                    // Dismiss the share sheet
+                    isLoading = false
                     dismiss()
-                    // Close the replayer
-                    showingReplay = false
-                    
-                    // Navigate to the feed tab
-                    navigateToFeedTab()
                 }
             } catch {
                 print("Error sharing hand: \(error)")
+                DispatchQueue.main.async {
+                    isLoading = false
+                }
             }
-            isLoading = false
         }
-    }
-    
-    private func navigateToFeedTab() {
-        // Find the top-most view controller
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else {
-            return
-        }
-        
-        // Access the TabView controller in HomePage
-        var current = rootVC
-        while let presented = current.presentedViewController {
-            current = presented
-        }
-        
-        // Post a notification to tell HomePage to switch to the feed tab
-        NotificationCenter.default.post(name: NSNotification.Name("SwitchToFeedTab"), object: nil)
     }
 } 

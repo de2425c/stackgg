@@ -92,10 +92,13 @@ class AuthService: ObservableObject {
             return error as! AuthError
         }
         
+        print("Firebase error: \(error.localizedDescription) (Code: \(nsError.code))")
+        
         switch nsError.code {
-        case AuthErrorCode.wrongPassword.rawValue,
-             AuthErrorCode.userNotFound.rawValue:
-            return .invalidCredentials
+        case AuthErrorCode.wrongPassword.rawValue:
+            return .wrongPassword
+        case AuthErrorCode.userNotFound.rawValue:
+            return .userNotFound
         case AuthErrorCode.invalidEmail.rawValue:
             return .invalidEmail
         case AuthErrorCode.emailAlreadyInUse.rawValue:
@@ -108,52 +111,63 @@ class AuthService: ObservableObject {
             return .tooManyRequests
         case AuthErrorCode.userDisabled.rawValue:
             return .userDisabled
+        case AuthErrorCode.requiresRecentLogin.rawValue:
+            return .requiresRecentLogin
         default:
-            return .unknown
+            return .unknown(message: error.localizedDescription)
         }
     }
 }
 
 enum AuthError: Error {
     case invalidCredentials
+    case wrongPassword
+    case userNotFound
     case networkError
     case invalidEmail
     case emailInUse
     case weakPassword
     case signOutError
-    case unknown
+    case unknown(message: String = "An unknown error occurred")
     case emailNotVerified
     case verificationEmailFailed
     case notAuthenticated
     case tooManyRequests
     case userDisabled
+    case requiresRecentLogin
     
     var message: String {
         switch self {
         case .invalidCredentials:
             return "Invalid email or password"
+        case .wrongPassword:
+            return "Incorrect password. Please try again."
+        case .userNotFound:
+            return "No account found with this email. Please check your email or sign up."
         case .networkError:
-            return "Network error occurred"
+            return "Network error occurred. Please check your internet connection."
         case .invalidEmail:
-            return "Invalid email format"
+            return "Invalid email format. Please enter a valid email address."
         case .emailInUse:
-            return "Email is already in use"
+            return "Email is already in use. Try signing in or use a different email."
         case .weakPassword:
-            return "Password must be at least 6 characters long"
+            return "Password must be at least 6 characters long."
         case .signOutError:
-            return "Error signing out"
+            return "Error signing out. Please try again."
         case .emailNotVerified:
-            return "Please verify your email before signing in"
+            return "Please verify your email before signing in. Check your inbox."
         case .verificationEmailFailed:
-            return "Failed to send verification email"
+            return "Failed to send verification email. Please try again later."
         case .notAuthenticated:
-            return "You must be logged in to perform this action"
+            return "You must be logged in to perform this action."
         case .tooManyRequests:
-            return "Too many requests. Please try again later"
+            return "Too many login attempts. Please try again later."
         case .userDisabled:
-            return "Your account has been disabled"
-        case .unknown:
-            return "An unknown error occurred"
+            return "Your account has been disabled. Please contact support."
+        case .requiresRecentLogin:
+            return "For security reasons, please sign in again before completing this action."
+        case .unknown(let message):
+            return message
         }
     }
 } 

@@ -1,5 +1,7 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
+import FirebaseStorage
 import PhotosUI
 import UIKit
 
@@ -26,23 +28,6 @@ struct HomePage: View {
         self.userId = userId
         _sessionStore = StateObject(wrappedValue: SessionStore(userId: userId))
         _handStore = StateObject(wrappedValue: HandStore(userId: userId))
-        
-        // Set up notification observer to switch to feed tab when a hand is shared
-        setupNotificationObserver()
-    }
-    
-    // Set up notification observer
-    private func setupNotificationObserver() {
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("SwitchToFeedTab"),
-            object: nil,
-            queue: .main
-        ) { [self] _ in
-            // Switch to feed tab when notification is received
-            DispatchQueue.main.async {
-                selectedTab = .feed
-            }
-        }
     }
     
     enum Tab {
@@ -151,10 +136,6 @@ struct HomePage: View {
         .sheet(isPresented: $showHandInputSheet) {
             // Use the binding directly, dismiss handled by PillMenu logic
             AddHandView(userId: userId, onDismiss: { showHandInputSheet = false })
-        }
-        .onDisappear {
-            // Remove observer when view disappears
-            NotificationCenter.default.removeObserver(self)
         }
     }
 }
@@ -714,121 +695,643 @@ struct ProfileEditView: View {
     var onSave: (UserProfile) -> Void
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var userService: UserService
-    let gameOptions = ["NLH", "PLO", "Stud8", "Omaha", "Razz"]
+    
+    // Profile data
+    @State private var displayName: String = ""
+    @State private var username: String = ""
+    @State private var bio: String = ""
+    @State private var favoriteGame: String = "NLH"
+    @State private var location: String = ""
+    
+    // UI states
     @State private var selectedImage: UIImage? = nil
     @State private var showImagePicker = false
     @State private var imagePickerItem: PhotosPickerItem? = nil
     @State private var isUploading = false
     @State private var uploadError: String? = nil
+    @State private var isAnimating = false
+    @State private var activeField: ProfileField? = nil
+    @State private var scrollOffset: CGFloat = 0
+    
+    // Delete account
+    @State private var showDeleteConfirmation = false
+    @State private var showFinalDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String? = nil
+    
+    // Game options
+    let gameOptions = ["NLH", "PLO", "Omaha", "Stud8", "Razz"]
+    
+    // Focus management
+    enum ProfileField {
+        case displayName, username, bio, location
+    }
+    
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Profile Information")) {
-                    TextField("Display Name", text: Binding(
-                        get: { profile.displayName ?? "" },
-                        set: { profile.displayName = $0.isEmpty ? nil : $0 }
-                    ))
-                    .font(.system(size: 16))
+        ZStack {
+            // Background
+            Color(red: 18/255, green: 18/255, blue: 22/255)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom navigation bar
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold, design: .default))
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(
+                                Circle()
+                                    .fill(Color(red: 30/255, green: 33/255, blue: 36/255))
+                            )
+                    }
                     
-                    TextField("Username", text: $profile.username)
-                        .font(.system(size: 16))
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                }
-                
-                Section(header: Text("Bio")) {
-                    TextEditor(text: Binding(
-                        get: { profile.bio ?? "" },
-                        set: { profile.bio = $0.isEmpty ? nil : $0 }
-                    ))
-                    .font(.system(size: 16))
-                    .frame(height: 80)
-                }
-                
-                Section(header: Text("Profile Picture")) {
-                    HStack {
-                        if let selectedImage = selectedImage {
-                            Image(uiImage: selectedImage)
-                                .resizable()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                        } else if let url = profile.avatarURL, let imageURL = URL(string: url) {
-                            ProfileImageView(url: imageURL)
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
+                    Spacer()
+                    
+                    Text("Edit Profile")
+                        .font(.system(size: 18, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button(action: saveProfile) {
+                        if isUploading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .frame(width: 20, height: 20)
                         } else {
-                            Circle().fill(Color.gray).frame(width: 80, height: 80)
+                            Text("Save")
+                                .font(.system(size: 16, weight: .semibold, design: .default))
+                                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
                         }
-                        Spacer()
+                    }
+                    .disabled(isUploading || isDeleting)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Profile photo section
+                        VStack(spacing: 16) {
+                            ZStack {
+                                // Profile image container
+                                Circle()
+                                    .fill(Color(red: 32/255, green: 34/255, blue: 38/255))
+                                    .frame(width: 120, height: 120)
+                                    .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 2)
+                                
+                                // Profile image
+                                if let selectedImage = selectedImage {
+                                    Image(uiImage: selectedImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 110, height: 110)
+                                        .clipShape(Circle())
+                                } else if let url = profile.avatarURL, !url.isEmpty, let imageURL = URL(string: url) {
+                                    AsyncImage(url: imageURL) { phase in
+                                        if let image = phase.image {
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 110, height: 110)
+                                                .clipShape(Circle())
+                                        } else if phase.error != nil {
+                                            Image(systemName: "person.fill")
+                                                .font(.system(size: 50, design: .default))
+                                                .foregroundColor(.gray)
+                                        } else {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 123/255, green: 255/255, blue: 99/255)))
+                                        }
+                                    }
+                                    .frame(width: 110, height: 110)
+                                } else {
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 50, design: .default))
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                // Camera button overlay
+                                PhotosPicker(selection: $imagePickerItem, matching: .images) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(red: 40/255, green: 40/255, blue: 45/255))
+                                            .frame(width: 32, height: 32)
+                                        
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 14, design: .default))
+                                            .foregroundColor(.white)
+                                    }
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color(red: 123/255, green: 255/255, blue: 99/255), lineWidth: 2)
+                                    )
+                                }
+                                .onChange(of: imagePickerItem) { newItem in
+                                    loadTransferableImage(from: newItem)
+                                }
+                                .position(x: 85, y: 85)
+                            }
+                            
+                            Text("Change Profile Photo")
+                                .font(.system(size: 14, weight: .medium, design: .default))
+                                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+                        }
+                        .padding(.top, 16)
                         
-                        PhotosPicker(selection: $imagePickerItem, matching: .images) {
-                            Text("Select Image")
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                                .cornerRadius(8)
-                        }
-                        .onChange(of: imagePickerItem) { newItem in
-                            guard let item = newItem else { return }
-                            Task {
-                                if let data = try? await item.loadTransferable(type: Data.self),
-                                   let image = UIImage(data: data) {
-                                    DispatchQueue.main.async {
-                                        selectedImage = image
+                        // Form fields
+                        VStack(spacing: 20) {
+                            // Display name field
+                            ProfileTextField(
+                                title: "DISPLAY NAME",
+                                placeholder: "Your display name",
+                                text: $displayName,
+                                isActive: activeField == .displayName,
+                                onEditingChanged: { isEditing in
+                                    activeField = isEditing ? .displayName : nil
+                                }
+                            )
+                            
+                            // Username field (non-editable)
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("USERNAME")
+                                    .font(.system(size: 12, weight: .medium, design: .default))
+                                    .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                
+                                HStack {
+                                    Text("@\(username)")
+                                        .font(.system(size: 16, design: .default))
+                                        .foregroundColor(.gray)
+                                        .padding()
+                                    
+                                    Spacer()
+                                }
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(red: 30/255, green: 33/255, blue: 36/255))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    Color.white.opacity(0.1),
+                                                    Color.clear,
+                                                    Color.clear,
+                                                    Color.clear
+                                                ]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1
+                                        )
+                                )
+                            }
+                            
+                            // Bio field
+                            ProfileTextField(
+                                title: "BIO",
+                                placeholder: "Tell us about yourself",
+                                text: $bio,
+                                isActive: activeField == .bio,
+                                onEditingChanged: { isEditing in
+                                    activeField = isEditing ? .bio : nil
+                                }
+                            )
+                            
+                            // Location field
+                            ProfileTextField(
+                                title: "LOCATION",
+                                placeholder: "Your location",
+                                text: $location,
+                                isActive: activeField == .location,
+                                onEditingChanged: { isEditing in
+                                    activeField = isEditing ? .location : nil
+                                }
+                            )
+                            
+                            // Favorite game picker
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("FAVORITE GAME")
+                                    .font(.system(size: 12, weight: .medium, design: .default))
+                                    .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                
+                                // Game selection cards
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(gameOptions, id: \.self) { game in
+                                            Button(action: {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    favoriteGame = game
+                                                }
+                                            }) {
+                                                Text(game)
+                                                    .font(.system(size: 15, weight: favoriteGame == game ? .semibold : .medium, design: .default))
+                                                    .foregroundColor(favoriteGame == game ? .black : .white)
+                                                    .padding(.horizontal, 20)
+                                                    .padding(.vertical, 12)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .fill(favoriteGame == game ?
+                                                                  Color(red: 123/255, green: 255/255, blue: 99/255) :
+                                                                  Color(red: 32/255, green: 35/255, blue: 40/255))
+                                                    )
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(
+                                                                favoriteGame == game ?
+                                                                Color.clear :
+                                                                Color.white.opacity(0.1),
+                                                                lineWidth: 1
+                                                            )
+                                                    )
+                                            }
+                                            .buttonStyle(ScaleButtonStyle())
+                                        }
                                     }
+                                    .padding(.vertical, 8)
                                 }
                             }
                         }
-                    }
-                }
-                
-                Section(header: Text("Favorite Game")) {
-                    Picker("Game", selection: Binding(
-                        get: { profile.favoriteGame ?? "NLH" },
-                        set: { profile.favoriteGame = $0 }
-                    )) {
-                        ForEach(gameOptions, id: \.self) { game in
-                            Text(game).tag(game)
+                        .padding(.horizontal, 20)
+                        
+                        // Error message
+                        if let uploadError = uploadError {
+                            Text(uploadError)
+                                .font(.system(size: 14, design: .default))
+                                .foregroundColor(.red)
+                                .padding(.top, 8)
                         }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                if let uploadError = uploadError {
-                    Text(uploadError).foregroundColor(.red)
-                }
-            }
-            .navigationTitle("Edit Profile")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(isUploading ? "Saving..." : "Save") {
-                        if let selectedImage = selectedImage {
-                            isUploading = true
-                            userService.uploadProfileImage(selectedImage, userId: profile.id) { result in
-                                DispatchQueue.main.async {
-                                    isUploading = false
-                                    switch result {
-                                    case .success(let urlString):
-                                        var updatedProfile = profile
-                                        updatedProfile.avatarURL = urlString
-                                        onSave(updatedProfile)
-                                        dismiss()
-                                    case .failure(let error):
-                                        uploadError = "Image upload error: \(error.localizedDescription)"
-                                    }
+                        
+                        // Delete account button
+                        VStack(spacing: 10) {
+                            Divider()
+                                .background(Color.gray.opacity(0.3))
+                                .padding(.top, 20)
+                            
+                            Button(action: { showDeleteConfirmation = true }) {
+                                HStack {
+                                    Spacer()
+                                    Text("Delete Account")
+                                        .font(.system(size: 15, weight: .medium, design: .default))
+                                        .foregroundColor(.red)
+                                    Spacer()
                                 }
+                                .padding(.vertical, 16)
                             }
-                        } else {
-                            onSave(profile)
-                            dismiss()
                         }
-                    }.disabled(isUploading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 30)
+                    }
+                    .padding(.bottom, 20)
                 }
             }
         }
+        .onAppear {
+            initializeFields()
+            animateIn()
+        }
+        .alert("Delete Your Account?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                showFinalDeleteConfirmation = true
+            }
+        } message: {
+            Text("This will remove all your data from the app. This action cannot be undone.")
+        }
+        .alert("Permanently Delete Account", isPresented: $showFinalDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Yes, Delete Everything", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("Are you absolutely sure? All your data, posts, groups, and messages will be permanently deleted.")
+        }
+        .alert("Error", isPresented: .init(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "An unknown error occurred")
+        }
+    }
+    
+    private func initializeFields() {
+        displayName = profile.displayName ?? ""
+        username = profile.username
+        bio = profile.bio ?? ""
+        favoriteGame = profile.favoriteGame ?? "NLH"
+        location = profile.location ?? ""
+    }
+    
+    private func animateIn() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeOut(duration: 0.4)) {
+                isAnimating = true
+            }
+        }
+    }
+    
+    private func loadTransferableImage(from imageSelection: PhotosPickerItem?) {
+        guard let imageSelection = imageSelection else { return }
+        
+        Task {
+            do {
+                if let data = try await imageSelection.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await MainActor.run {
+                        selectedImage = image
+                    }
+                }
+            } catch {
+                print("Error loading image: \(error)")
+            }
+        }
+    }
+    
+    private func saveProfile() {
+        // Update the profile with edited values
+        var updatedProfile = profile
+        updatedProfile.displayName = displayName.isEmpty ? nil : displayName
+        updatedProfile.username = username
+        updatedProfile.bio = bio.isEmpty ? nil : bio
+        updatedProfile.favoriteGame = favoriteGame
+        updatedProfile.location = location.isEmpty ? nil : location
+        
+        // Handle image upload if needed
+        if let selectedImage = selectedImage {
+            isUploading = true
+            uploadError = nil
+            
+            userService.uploadProfileImage(selectedImage, userId: profile.id) { result in
+                DispatchQueue.main.async {
+                    isUploading = false
+                    switch result {
+                    case .success(let urlString):
+                        updatedProfile.avatarURL = urlString
+                        saveProfileToFirestore(updatedProfile)
+                    case .failure(let error):
+                        uploadError = "Image upload error: \(error.localizedDescription)"
+                    }
+                }
+            }
+        } else {
+            saveProfileToFirestore(updatedProfile)
+        }
+    }
+    
+    private func saveProfileToFirestore(_ updatedProfile: UserProfile) {
+        Task {
+            do {
+                try await userService.updateUserProfile([
+                    "displayName": updatedProfile.displayName ?? "",
+                    "username": updatedProfile.username,
+                    "bio": updatedProfile.bio ?? "",
+                    "favoriteGame": updatedProfile.favoriteGame ?? "NLH",
+                    "location": updatedProfile.location ?? "",
+                    "avatarURL": updatedProfile.avatarURL ?? ""
+                ])
+                
+                await MainActor.run {
+                    onSave(updatedProfile)
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    uploadError = "Failed to save profile: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func deleteAccount() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            deleteError = "Not signed in"
+            return
+        }
+        
+        isDeleting = true
+        
+        Task {
+            do {
+                // 1. Delete user data from collections
+                try await deleteUserDataFromFirestore(userId)
+                
+                // 2. Delete Firebase Auth user
+                try await Auth.auth().currentUser?.delete()
+                
+                // 3. Sign out immediately after successful deletion
+                do {
+                    try Auth.auth().signOut()
+                } catch {
+                    print("Error signing out after account deletion: \(error.localizedDescription)")
+                }
+                
+                await MainActor.run {
+                    isDeleting = false
+                    // The app will automatically redirect to the sign-in page due to auth state change
+                }
+            } catch {
+                await MainActor.run {
+                    isDeleting = false
+                    deleteError = "Failed to delete account: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func deleteUserDataFromFirestore(_ userId: String) async throws {
+        let db = Firestore.firestore()
+        let batch = db.batch()
+        
+        // Delete user document
+        batch.deleteDocument(db.collection("users").document(userId))
+        
+        // Delete user's groups
+        let userGroups = try await db.collection("users")
+            .document(userId)
+            .collection("groups")
+            .getDocuments()
+        
+        for doc in userGroups.documents {
+            batch.deleteDocument(doc.reference)
+        }
+        
+        // Delete user's group invites
+        let userInvites = try await db.collection("users")
+            .document(userId)
+            .collection("groupInvites")
+            .getDocuments()
+        
+        for doc in userInvites.documents {
+            batch.deleteDocument(doc.reference)
+        }
+        
+        // Delete user's followers/following
+        let followers = try await db.collection("users")
+            .document(userId)
+            .collection("followers")
+            .getDocuments()
+        
+        for doc in followers.documents {
+            batch.deleteDocument(doc.reference)
+        }
+        
+        let following = try await db.collection("users")
+            .document(userId)
+            .collection("following")
+            .getDocuments()
+        
+        for doc in following.documents {
+            batch.deleteDocument(doc.reference)
+        }
+        
+        // Commit the batch deletion of Firestore data
+        try await batch.commit()
+        
+        // Attempt to delete profile image, but don't let it stop the account deletion process
+        do {
+            try await Storage.storage().reference()
+                .child("profile_images/\(userId).jpg")
+                .delete()
+        } catch {
+            // Log the error but continue with account deletion
+            print("Profile image deletion failed: \(error.localizedDescription). Continuing with account deletion.")
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct ProfileTextField: View {
+    let title: String
+    let placeholder: String
+    @Binding var text: String
+    let isActive: Bool
+    let onEditingChanged: (Bool) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium, design: .default))
+                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+            
+            TextField(placeholder, text: $text, onEditingChanged: onEditingChanged)
+                .font(.system(size: 16, design: .default))
+                .foregroundColor(.white)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(red: 30/255, green: 33/255, blue: 36/255))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            isActive ?
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(red: 123/255, green: 255/255, blue: 99/255)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.1),
+                                    Color.clear,
+                                    Color.clear,
+                                    Color.clear
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: isActive ? 1.5 : 1
+                        )
+                )
+                .animation(.easeOut(duration: 0.2), value: isActive)
+        }
+    }
+}
+
+struct ProfileTextEditor: View {
+    let title: String
+    let placeholder: String
+    @Binding var text: String
+    let isActive: Bool
+    let onEditingChanged: (Bool) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium, design: .default))
+                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+            
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .font(.system(size: 16, design: .default))
+                        .foregroundColor(.gray.opacity(0.7))
+                        .padding(.top, 16)
+                        .padding(.leading, 16)
+                }
+                
+                TextEditor(text: $text)
+                    .font(.system(size: 16, design: .default))
+                    .foregroundColor(.white)
+                    .frame(minHeight: 100)
+                    .padding(4)
+                    .background(Color.clear)
+                    .onTapGesture {
+                        onEditingChanged(true)
+                    }
+                    .onAppear {
+                        UITextView.appearance().backgroundColor = .clear
+                    }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(red: 30/255, green: 33/255, blue: 36/255))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        isActive ?
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(red: 123/255, green: 255/255, blue: 99/255)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.white.opacity(0.1),
+                                Color.clear,
+                                Color.clear,
+                                Color.clear
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: isActive ? 1.5 : 1
+                    )
+            )
+            .frame(height: 120)
+            .animation(.easeOut(duration: 0.2), value: isActive)
+        }
+    }
+}
+
+// Scale animation button style
+struct ScaleButtonStyle: ButtonStyle {
+    let scaleAmount: CGFloat
+    
+    init(scaleAmount: CGFloat = 0.97) {
+        self.scaleAmount = scaleAmount
+    }
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scaleAmount : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 

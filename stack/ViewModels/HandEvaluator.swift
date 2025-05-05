@@ -174,6 +174,7 @@ struct HandEvaluator {
     
     // Evaluate the best 5-card hand from the given cards
     static func evaluateBestHand(cards: [String]) -> HandEvaluation? {
+        print("hello")
         // Convert string cards to Card objects
         let parsedCards = cards.compactMap { Card(from: $0) }
         guard parsedCards.count >= 5 else { return nil }
@@ -351,42 +352,44 @@ struct HandEvaluator {
     
     // Check for a straight
     private static func checkStraight(cards: [Card]) -> HandEvaluation? {
-        // Remove duplicate ranks, keep highest card of each rank
+        // Map all card ranks to their integer values (Ace as both 14 and 1 for wheel)
         var rankToCard: [Int: Card] = [:]
         for card in cards.sorted(by: { $0.rankValue > $1.rankValue }) {
             if rankToCard[card.rankValue] == nil {
                 rankToCard[card.rankValue] = card
             }
         }
-        let uniqueRanks = rankToCard.keys.sorted()
-        if uniqueRanks.count < 5 { return nil }
-        // Check for normal straights (descending order for high card)
-        for i in stride(from: uniqueRanks.count - 1, through: 4, by: -1) {
-            let window = Array(uniqueRanks[(i-4)...i])
-            if window[4] - window[0] == 4 && Set(window).count == 5 {
-                let straightCards = window.reversed().compactMap { rankToCard[$0] }
+        // Add Ace as 1 for wheel straight if present
+        if rankToCard[14] != nil {
+            let aceLowCard = rankToCard[14]!
+            rankToCard[1] = aceLowCard
+        }
+        let uniqueRanks = rankToCard.keys.sorted(by: >)
+        // Check for any sequence of 5 consecutive values
+        for i in 0...(uniqueRanks.count - 5) {
+            let window = Array(uniqueRanks[i..<(i+5)])
+            var isConsecutive = true
+            for j in 0..<4 {
+                if window[j] - window[j+1] != 1 {
+                    isConsecutive = false
+                    break
+                }
+            }
+            if isConsecutive {
+                let straightCards = window.map { rankToCard[$0]! }
                 return HandEvaluation(
                     rank: .straight,
                     cards: straightCards,
-                    tiebreakers: [window[4]] // high card of the straight
+                    tiebreakers: [window[0]] // high card of the straight
                 )
             }
-        }
-        // Check for wheel straight (A-2-3-4-5)
-        let wheel = [14, 5, 4, 3, 2]
-        if wheel.allSatisfy({ rankToCard[$0] != nil }) {
-            let straightCards = wheel.compactMap { rankToCard[$0] }
-            return HandEvaluation(
-                rank: .straight,
-                cards: straightCards,
-                tiebreakers: [5] // 5-high straight
-            )
         }
         return nil
     }
     
     // Check for three of a kind
     private static func checkThreeOfAKind(cards: [Card]) -> HandEvaluation? {
+
         let rankCounts = getRankCounts(cards: cards)
         let trips = rankCounts.filter { $0.value == 3 }.map { $0.key }.sorted(by: >)
         for tripRank in trips {

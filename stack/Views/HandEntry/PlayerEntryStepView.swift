@@ -17,7 +17,7 @@ struct PlayerEntryStepView: View {
                 // Add extra spacing at the top
                 
                 // Instructions
-                Text("Enter the players involved in this hand, including the Hero and relevant villains.")
+                Text("Only enter the villains involved in the hand, everything else will be automatically populated.")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                     .padding(.bottom, 4)

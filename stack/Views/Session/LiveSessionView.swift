@@ -49,324 +49,415 @@ struct LiveSessionView: View {
     }
     
     var setupSectionView: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            // Section title with icon
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [Color.white.opacity(0.1), Color.green.opacity(0.1)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                }
-                Text("Select Game")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
-                Spacer()
-                Button(action: { showingAddGame = true }) {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.1)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 40, height: 40)
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                    }
-                    .shadow(color: Color.green.opacity(0.3), radius: 8, y: 2)
-                }
-            }
-            .padding(.horizontal, 18)
-            
-            if gameService.customGames.isEmpty {
-                // Beautiful empty state
-                VStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.05))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 36))
-                            .foregroundColor(Color.white.opacity(0.5))
-                    }
-                    
-                    Text("No Games Added Yet")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    Text("Tap + to add your first poker game")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 50)
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(Color.white.opacity(0.03))
-                        .background(BlurView(style: .systemThinMaterialDark))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.15), radius: 10, y: 5)
-                .padding(.horizontal, 18)
-                .padding(.top, 10)
-            } else {
-                // Game selection grid with beautiful scrolling
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(gameService.customGames) { game in
-                            GameOptionCards(
-                                game: GameOption(name: game.name, stakes: game.stakes),
-                                isSelected: selectedGame?.name == game.name && selectedGame?.stakes == game.stakes,
-                                action: { selectedGame = GameOption(name: game.name, stakes: game.stakes) }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                }
-            }
-            
-            // Buy-in section with modern design
-            VStack(alignment: .leading, spacing: 20) {
-                // Section title with icon
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [Color.white.opacity(0.1), Color.green.opacity(0.1)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                    }
-                    Text("Buy In")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
-                }
-                .padding(.horizontal, 18)
-                
-                // Beautiful buy-in field
+        VStack(spacing: 24) {
+            // Game Selection Section
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("$")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.8))
-                        .padding(.leading, 24)
-                    
-                    TextField("0", text: $buyIn)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text("Select Game")
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
-                        .frame(height: 70)
+                        .padding(.leading, 2)
                     
-                    if !buyIn.isEmpty {
-                        Button(action: { buyIn = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.trailing, 20)
-                        .transition(.opacity)
-                        .animation(.easeInOut, value: buyIn.isEmpty)
+                    Spacer()
+                    
+                    Button(action: { showingAddGame = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
                     }
                 }
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [Color.white.opacity(0.08), Color.green.opacity(0.06)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .background(BlurView(style: .systemThinMaterialDark))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1.5)
-                )
-                .shadow(color: Color.black.opacity(0.1), radius: 10, y: 5)
-                .padding(.horizontal, 18)
+                
+                if gameService.customGames.isEmpty {
+                    Text("No games added yet. Tap + to add a game.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(gameService.customGames) { game in
+                                GameOptionCards(
+                                    game: GameOption(name: game.name, stakes: game.stakes),
+                                    isSelected: selectedGame?.name == game.name && selectedGame?.stakes == game.stakes,
+                                    action: { selectedGame = GameOption(name: game.name, stakes: game.stakes) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.bottom, 8)
+                    }
+                }
             }
-            Spacer()
+            .padding(.horizontal)
+            
+            // Game Info Section - Buy-in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Game Info")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.leading, 2)
+                
+                VStack(spacing: 16) {
+                    // Enhanced Buy-in field
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Buy In")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gray)
+                        
+                        HStack {
+                            Text("$")
+                                .foregroundColor(.gray)
+                                .font(.system(size: 18, weight: .semibold))
+                            
+                            TextField("0.00", text: $buyIn)
+                                .keyboardType(.decimalPad)
+                                .foregroundColor(.white)
+                                .font(.system(size: 20, weight: .medium))
+                                .frame(height: 44)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.3))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+            .padding(.horizontal)
         }
-        .padding(.top, 18)
     }
     
     var timerSectionView: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Session Timer")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
                 .padding(.leading, 2)
-            HStack(spacing: 18) {
-                TimerUnitView(
-                    value: formattedElapsedTime.hours,
-                    unit: "HR"
-                )
-                TimerUnitView(
-                    value: formattedElapsedTime.minutes,
-                    unit: "MIN"
-                )
-                TimerUnitView(
-                    value: formattedElapsedTime.seconds,
-                    unit: "SEC"
-                )
+            
+            HStack(spacing: 12) {
+                // Hours
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Hours")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Text("\(formattedElapsedTime.hours)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black.opacity(0.3))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                
+                // Minutes
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Minutes")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Text("\(formattedElapsedTime.minutes)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black.opacity(0.3))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                
+                // Seconds
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Seconds")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    Text("\(formattedElapsedTime.seconds)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black.opacity(0.3))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color.white.opacity(0.08), Color.green.opacity(0.08)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .background(BlurView(style: .systemThinMaterialDark))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.green.opacity(0.18), lineWidth: 1.5)
-            )
-            .shadow(color: Color.green.opacity(0.10), radius: 8, y: 2)
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal)
     }
 
     var cashoutSectionView: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Section title with icon
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [Color.white.opacity(0.1), Color.green.opacity(0.1)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                }
-                Text("Cashout")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
-            }
-            .padding(.horizontal, 18)
-            // Beautiful cashout field
-            HStack {
-                Text("$")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundColor(Color.white.opacity(0.8))
-                    .padding(.leading, 24)
-                TextField("0", text: $cashout)
-                    .keyboardType(.decimalPad)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .frame(height: 70)
-                if !cashout.isEmpty {
-                    Button(action: { cashout = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Game Info")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white)
+                .padding(.leading, 2)
+            
+            VStack(spacing: 16) {
+                // Enhanced Buy-in display (non-editable)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Buy In")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Text("$")
                             .foregroundColor(.gray)
+                            .font(.system(size: 18, weight: .semibold))
+                        
+                        Text(String(format: "%.2f", sessionStore.liveSession.buyIn))
+                            .foregroundColor(.white)
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(height: 44)
                     }
-                    .padding(.trailing, 20)
-                    .transition(.opacity)
-                    .animation(.easeInOut, value: cashout.isEmpty)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
+                
+                // Enhanced Cashout field
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Cashout")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Text("$")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 18, weight: .semibold))
+                        
+                        TextField("0.00", text: $cashout)
+                            .keyboardType(.decimalPad)
+                            .foregroundColor(.white)
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(height: 44)
+                        
+                        // Show profit/loss preview if cashout has a value
+                        if let cashoutValue = Double(cashout) {
+                            let profit = cashoutValue - sessionStore.liveSession.buyIn
+                            let isProfit = profit >= 0
+                            
+                            Text(String(format: "%@$%.2f", isProfit ? "+" : "", profit))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(isProfit ? 
+                                    Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : 
+                                    Color.red)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(isProfit ? 
+                                            Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 0.2)) : 
+                                            Color.red.opacity(0.2))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color.white.opacity(0.08), Color.green.opacity(0.06)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .background(BlurView(style: .systemThinMaterialDark))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1.5)
-            )
-            .shadow(color: Color.black.opacity(0.1), radius: 10, y: 5)
-            .padding(.horizontal, 18)
         }
+        .padding(.horizontal)
     }
 
-    var scrollContentView: some View {
-        VStack(spacing: 32) {
-            // Game selection section (only in setup mode)
-            if sessionMode == .setup {
-                setupSectionView
+    var activeSessionView: some View {
+        VStack(spacing: 24) {
+            // Game Summary Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Game Info")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.leading, 2)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sessionStore.liveSession.gameName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Text(sessionStore.liveSession.stakes)
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Buy In")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                        
+                        Text("$\(Int(sessionStore.liveSession.buyIn))")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
-            // Timer section (if not in setup mode)
-            if sessionMode != .setup {
-                timerSectionView
+            .padding(.horizontal)
+            
+            // Timer Section
+            timerSectionView
+            
+            // Action Buttons
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Actions")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.leading, 2)
+                
+                HStack(spacing: 12) {
+                    // Rebuy Button
+                    Button(action: { showingRebuyAlert = true }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                            
+                            Text("Rebuy")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(red: 0.2, green: 0.2, blue: 0.6).opacity(0.8))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+                    
+                    // Pause/Resume Button
+                    Button(action: { sessionMode == .paused ? resumeSession() : pauseSession() }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: sessionMode == .paused ? "play.circle.fill" : "pause.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                            
+                            Text(sessionMode == .paused ? "Resume" : "Pause")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(sessionMode == .paused ? 
+                                      Color(red: 0.2, green: 0.6, blue: 0.2).opacity(0.8) : 
+                                      Color(red: 0.6, green: 0.4, blue: 0.1).opacity(0.8))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(sessionMode == .paused ?
+                                        Color.green.opacity(0.4) :
+                                        Color.orange.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+                    
+                    // End Button
+                    Button(action: { showingCashoutPrompt = true }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "stop.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                            
+                            Text("End")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(red: 0.6, green: 0.1, blue: 0.1).opacity(0.8))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.red.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+                }
             }
-            // Cashout section (only in ending mode)
-            if sessionMode == .ending {
-                cashoutSectionView
-            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 32)
     }
     
     var body: some View {
         NavigationView {
             ZStack {
                 AppBackgroundView()
-                // Main content based on session mode
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    if sessionMode == .active || sessionMode == .paused {
-                        ActiveSessionView(
-                            elapsedTime: formattedElapsedTime,
-                            buyIn: .constant(String(format: "%.2f", sessionStore.liveSession.buyIn)),
-                            gameName: sessionStore.liveSession.gameName,
-                            gameStakes: sessionStore.liveSession.stakes,
-                            isPaused: sessionMode == .paused,
-                            onPause: pauseSession,
-                            onResume: resumeSession,
-                            onRebuy: { showingRebuyAlert = true },
-                            onEnd: { showingCashoutPrompt = true }
-                        )
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
-                        // Setup or cashout view
-                        ScrollView(showsIndicators: false) {
-                            scrollContentView
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        // Different content based on session mode
+                        switch sessionMode {
+                        case .setup:
+                            setupSectionView
+                        case .active, .paused:
+                            activeSessionView
+                        case .ending:
+                            cashoutSectionView
                         }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                    Spacer(minLength: 0)
+                    .padding(.top, 20)
+                    .padding(.bottom, 100) // Extra padding for the button at bottom
                 }
-                // Bottom buttons
+                
+                // Bottom Button
                 VStack {
                     Spacer()
                     
                     switch sessionMode {
                     case .setup:
-                        // Start button
                         Button(action: startSession) {
                             Text("Start Session")
                                 .font(.system(size: 17, weight: .bold))
@@ -378,17 +469,6 @@ struct LiveSessionView: View {
                         }
                         .disabled(selectedGame == nil || buyIn.isEmpty)
                         .opacity((selectedGame == nil || buyIn.isEmpty) ? 0.6 : 1)
-                        .padding(.horizontal)
-                        .padding(.bottom, 34)
-                        
-                    case .active:
-                        // No bottom buttons in active mode (they're in the ActiveSessionView)
-                        EmptyView()
-                        
-                    case .paused:
-                        // No bottom buttons in paused mode (they're in the ActiveSessionView)
-                        EmptyView()
-                        
                     case .ending:
                         Button(action: saveSession) {
                             HStack {
@@ -408,12 +488,19 @@ struct LiveSessionView: View {
                         }
                         .disabled(cashout.isEmpty)
                         .opacity(cashout.isEmpty ? 0.6 : 1)
-                        .padding(.horizontal)
-                        .padding(.bottom, 34)
+                    case .active, .paused:
+                        // No bottom button needed, actions are in the active view
+                        EmptyView()
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 34)
             }
-            .navigationTitle(sessionMode == .active ? "Live Session" : (sessionMode == .ending ? "End Session" : "New Session"))
+            .navigationTitle(
+                sessionMode == .setup ? "New Session" : 
+                sessionMode == .ending ? "End Session" : 
+                "Live Session"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -592,262 +679,39 @@ struct LiveSessionView: View {
     }
 }
 
-// Modernize ActiveSessionView
-struct ActiveSessionView: View {
-    let elapsedTime: (hours: Int, minutes: Int, seconds: Int)
-    @Binding var buyIn: String
-    let gameName: String
-    let gameStakes: String
-    let isPaused: Bool
-    let onPause: () -> Void
-    let onResume: () -> Void
-    let onRebuy: () -> Void
-    let onEnd: () -> Void
-    var body: some View {
-        VStack(spacing: 32) {
-            // Modern glassy card for game info
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(gameStakes)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                    Text(gameName)
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundColor(.green.opacity(0.7))
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("Buy-in")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundColor(.gray)
-                    Text("$\(buyIn)")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
-                        .shadow(color: Color.green.opacity(0.18), radius: 2, y: 1)
-                }
-            }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color.white.opacity(0.10), Color.green.opacity(0.10)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .background(BlurView(style: .systemThinMaterialDark))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(Color.green.opacity(0.18), lineWidth: 1.5)
-            )
-            .shadow(color: Color.green.opacity(0.10), radius: 10, y: 2)
-            // Timer display with glowing border
-            VStack(spacing: 10) {
-                Text("Session Duration")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(.gray)
-                HStack(spacing: 8) {
-                    Text("\(elapsedTime.hours)")
-                        .font(.system(size: 68, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 90, alignment: .center)
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                    Text(":")
-                        .font(.system(size: 68, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .offset(y: -4)
-                    Text(String(format: "%02d", elapsedTime.minutes))
-                        .font(.system(size: 68, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 90, alignment: .center)
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                    Text(":")
-                        .font(.system(size: 68, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .offset(y: -4)
-                    Text(String(format: "%02d", elapsedTime.seconds))
-                        .font(.system(size: 68, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 90, alignment: .center)
-                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                }
-                .padding(18)
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [Color.green.opacity(0.10), Color.white.opacity(0.10)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .background(BlurView(style: .systemThinMaterialDark))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.green.opacity(0.22), lineWidth: 2)
-                        .shadow(color: Color.green.opacity(0.18), radius: 8, y: 2)
-                )
-                .shadow(color: Color.green.opacity(0.10), radius: 10, y: 2)
-            }
-            // Action buttons
-            HStack(spacing: 18) {
-                // Rebuy button
-                Button(action: onRebuy) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 30))
-                        Text("Rebuy")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(Color.blue.opacity(0.18))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.blue.opacity(0.28), lineWidth: 1.2)
-                    )
-                    .shadow(color: Color.blue.opacity(0.10), radius: 6, y: 2)
-                }
-                // Pause/Resume button
-                Button(action: { isPaused ? onResume() : onPause() }) {
-                    VStack(spacing: 8) {
-                        Image(systemName: isPaused ? "play.circle.fill" : "pause.circle.fill")
-                            .font(.system(size: 30))
-                        Text(isPaused ? "Resume" : "Pause")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(isPaused ? Color.green.opacity(0.18) : Color.orange.opacity(0.18))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(isPaused ? Color.green.opacity(0.28) : Color.orange.opacity(0.28), lineWidth: 1.2)
-                    )
-                    .shadow(color: isPaused ? Color.green.opacity(0.10) : Color.orange.opacity(0.10), radius: 6, y: 2)
-                }
-                // End button
-                Button(action: onEnd) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 30))
-                        Text("End")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(Color.red.opacity(0.18))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.red.opacity(0.28), lineWidth: 1.2)
-                    )
-                    .shadow(color: Color.red.opacity(0.10), radius: 6, y: 2)
-                }
-            }
-            .padding(.top, 8)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 32)
-        .background(
-            RoundedRectangle(cornerRadius: 32)
-                .fill(Color.white.opacity(0.03))
-                .shadow(color: .black.opacity(0.10), radius: 18, y: 4)
-        )
-        .padding(.horizontal, 8)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isPaused)
-    }
-}
-
-struct TimerUnitView: View {
-    let value: Int
-    let unit: String
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Text("\(value)")
-                .font(.system(size: 40, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
-                .frame(minWidth: 70)
-            
-            Text(unit)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color.gray)
-        }
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.4))
-        )
-    }
-}
-
-// Add BlurView helper for glassy backgrounds
-
-// Update GameOptionCard to be more beautiful with the same style as ActiveSessionView
+// Update the GameOptionCard to match the past session view style
 struct GameOptionCards: View {
     let game: GameOption
     let isSelected: Bool
     let action: () -> Void
     
-    private var accentColor: Color {
-        Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0))
-    }
-    
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(game.stakes)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
                 Text(game.name)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundColor(isSelected ? accentColor.opacity(0.9) : .gray)
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
             }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 22)
-            .frame(height: 90)
-            .frame(minWidth: 130)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(minWidth: 120)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1.7, contentMode: .fit)
             .background(
-                ZStack {
-                    // Glassy background
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.white.opacity(isSelected ? 0.15 : 0.08),
-                                isSelected ? accentColor.opacity(0.15) : Color.white.opacity(0.06)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .background(BlurView(style: .systemThinMaterialDark))
-                        
-                    // Selection indicator
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(accentColor.opacity(0.6), lineWidth: 2)
-                            .shadow(color: accentColor.opacity(0.3), radius: 4, x: 0, y: 0)
-                    } else {
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    }
-                }
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isSelected ? 
+                                    Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)) : 
+                                    Color.gray.opacity(0.3), 
+                                    lineWidth: isSelected ? 2 : 1)
+                    )
             )
-            .shadow(color: isSelected ? accentColor.opacity(0.2) : Color.black.opacity(0.1), radius: 8, y: 2)
         }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 

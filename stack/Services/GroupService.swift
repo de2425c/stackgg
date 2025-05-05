@@ -15,7 +15,7 @@ class GroupService: ObservableObject {
     @Published var groupMessages: [GroupMessage] = []
     
     // Create a new group
-    func createGroup(name: String, description: String?) async throws -> UserGroup {
+    func createGroup(name: String, description: String?, image: UIImage? = nil) async throws -> UserGroup {
         guard let userId = Auth.auth().currentUser?.uid else {
             throw GroupServiceError.notAuthenticated
         }
@@ -25,13 +25,24 @@ class GroupService: ObservableObject {
         let groupId = groupRef.documentID
         
         let timestamp = Timestamp(date: Date())
-        let groupData: [String: Any] = [
+        var groupData: [String: Any] = [
             "name": name,
             "description": description ?? "",
             "createdAt": timestamp,
             "ownerId": userId,
             "memberCount": 1
         ]
+        
+        // If image is provided, upload it first
+        if let image = image {
+            do {
+                let imageURL = try await uploadGroupImage(image, groupId: groupId)
+                groupData["avatarURL"] = imageURL
+            } catch {
+                print("Error uploading group image: \(error.localizedDescription)")
+                // Continue creating the group without the image
+            }
+        }
         
         // Add the group to Firestore
         try await groupRef.setData(groupData)
@@ -59,6 +70,7 @@ class GroupService: ObservableObject {
             description: description,
             createdAt: timestamp.dateValue(),
             ownerId: userId,
+            avatarURL: groupData["avatarURL"] as? String,
             memberCount: 1
         )
         
@@ -524,13 +536,69 @@ class GroupService: ObservableObject {
         }
     }
     
-    // Upload a group profile image
+    // Upload a group profile image and return its download URL
     func uploadGroupImage(_ image: UIImage, groupId: String) async throws -> String {
+        print("GROUP SERVICE: Starting group image upload for group \(groupId)")
+        
+        // Compress the image to reduce upload size
+        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+            print("GROUP SERVICE: Failed to compress image")
+            throw GroupServiceError.invalidData
+        }
+        
+        // Create a unique file name for the image
+        let fileName = "group_\(groupId)_\(Date().timeIntervalSince1970).jpg"
+        
+        // Get the Firebase Storage reference
+        let storageRef = storage.reference().child("groups/\(fileName)")
+        
+        print("GROUP SERVICE: Starting Firebase Storage upload for group image")
+        
+        // Upload the image to Firebase Storage
+        do {
+            // Upload the image
+            _ = try await storageRef.putData(imageData, metadata: nil)
+            print("GROUP SERVICE: Group image uploaded successfully")
+            
+            // Add a small delay to allow Firebase to process the upload
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+            
+            // Get the download URL with retries
+            var downloadURL: URL?
+            var retryCount = 0
+            let maxRetries = 3
+            
+            while downloadURL == nil && retryCount < maxRetries {
+                do {
+                    downloadURL = try await storageRef.downloadURL()
+                    print("GROUP SERVICE: Got group image download URL on attempt \(retryCount + 1): \(downloadURL?.absoluteString ?? "nil")")
+                } catch {
+                    retryCount += 1
+                    print("GROUP SERVICE: Failed to get group image download URL (attempt \(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                    if retryCount < maxRetries {
+                        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 second delay between retries
+                    }
+                }
+            }
+            
+            guard let finalURL = downloadURL else {
+                throw NSError(domain: "GroupService", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL after \(maxRetries) attempts"])
+            }
+            
+            return finalURL.absoluteString
+        } catch {
+            print("GROUP SERVICE ERROR: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // Update the group avatar URL directly
+    func updateGroupAvatar(groupId: String, avatarURL: String) async throws {
         guard let userId = Auth.auth().currentUser?.uid else {
             throw GroupServiceError.notAuthenticated
         }
         
-        // Check if the user is the group owner
+        // Check if the user is the group owner or fetch the group if needed
         let groupDoc = try await db.collection("groups")
             .document(groupId)
             .getDocument()
@@ -541,33 +609,19 @@ class GroupService: ObservableObject {
             throw GroupServiceError.permissionDenied
         }
         
-        // Upload the image to Firebase Storage
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw GroupServiceError.invalidData
-        }
-        
-        let storageRef = storage.reference().child("group_images/\(groupId).jpg")
-        
-        // Upload the image
-        _ = try await storageRef.putData(imageData, metadata: nil)
-        
-        // Get the download URL
-        let downloadURL = try await storageRef.downloadURL()
-        let httpsUrlString = downloadURL.absoluteString
-        
         // Update the group's avatarURL field
         try await db.collection("groups")
             .document(groupId)
-            .updateData(["avatarURL": httpsUrlString])
+            .updateData(["avatarURL": avatarURL])
         
         // Update the group in the local list
         await MainActor.run {
             if let index = self.userGroups.firstIndex(where: { $0.id == groupId }) {
-                self.userGroups[index].avatarURL = httpsUrlString
+                var updatedGroup = self.userGroups[index]
+                updatedGroup.avatarURL = avatarURL
+                self.userGroups[index] = updatedGroup
             }
         }
-        
-        return httpsUrlString
     }
     
     // MARK: - Chat Methods
