@@ -163,6 +163,14 @@ struct GroupsView: View {
                     GroupDetailView(group: group)
                 }
             }
+            .onChange(of: showingGroupDetails) { isShowing in
+                if !isShowing {
+                    // Refresh groups when the detail view is dismissed
+                    Task {
+                        await refreshGroups()
+                    }
+                }
+            }
             .sheet(isPresented: $showingGroupChat) {
                 if let group = selectedGroup {
                     GroupChatView(group: group)
@@ -201,11 +209,31 @@ struct GroupsView: View {
                 }
             }
             .onAppear {
+                // Set up notification observer
+                setupNotificationObserver()
+                
                 Task {
                     await refreshGroups()
                 }
             }
+            .onDisappear {
+                // Clean up notification observer
+                NotificationCenter.default.removeObserver(self)
+            }
             .navigationBarHidden(true)
+        }
+    }
+    
+    // Set up notification observer for group data changes
+    private func setupNotificationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("GroupDataChanged"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task {
+                await refreshGroups()
+            }
         }
     }
     
@@ -437,7 +465,7 @@ struct GroupCard: View {
                 }
             }
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(ScaleButtonStyles())
     }
     
     private func formattedDate(_ date: Date) -> String {
@@ -448,7 +476,7 @@ struct GroupCard: View {
 }
 
 // Custom button style for subtle scaling on press
-struct ScaleButtonStyle: ButtonStyle {
+struct ScaleButtonStyles: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -806,16 +834,12 @@ struct CreateGroupView: View {
                 let description = groupDescription.isEmpty ? nil : groupDescription
                 
                 if let image = selectedImage {
-                    // Create group with image
-                    // Simplified - just create normal group if image handling not implemented yet
                     _ = try await groupService.createGroup(
                         name: groupName,
-                        description: description
+                        description: description,
+                        image: image
                     )
-                    // Upload image separately if needed
-                    // Not implemented yet
                 } else {
-                    // Create group without image
                     _ = try await groupService.createGroup(
                         name: groupName,
                         description: description
@@ -1069,7 +1093,7 @@ struct InviteCard: View {
                             .fill(Color(red: 123/255, green: 255/255, blue: 99/255))
                     )
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .buttonStyle(ScaleButtonStyles())
                 
                 // Decline button
                 Button(action: onDecline) {
@@ -1088,7 +1112,7 @@ struct InviteCard: View {
                             .fill(Color(red: 45/255, green: 45/255, blue: 50/255))
                     )
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .buttonStyle(ScaleButtonStyles())
             }
         }
         .padding(20)
@@ -1422,31 +1446,20 @@ struct GroupDetailView: View {
         
         Task {
             do {
-                // Compress the image to reduce upload size
-                guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-                    throw NSError(domain: "Image compression failed", code: 0)
-                }
-                
-                // Create a unique file name for the image
-                let fileName = "group_\(group.id)_\(Date().timeIntervalSince1970).jpg"
-                
-                // Get the Firebase Storage reference
-                let storage = Storage.storage()
-                let storageRef = storage.reference()
-                let imageRef = storageRef.child("groups/\(fileName)")
-                
-                // Upload the image to Firebase Storage
-                let metadata = StorageMetadata()
-                metadata.contentType = "image/jpeg"
-                
-                let _ = try await imageRef.putDataAsync(imageData, metadata: metadata)
-                let downloadURL = try await imageRef.downloadURL()
+                // Use the GroupService's uploadGroupImage function
+                let imageURL = try await groupService.uploadGroupImage(image, groupId: group.id)
                 
                 // Update the group avatar URL in Firebase
-                try await groupService.updateGroupAvatar(groupId: group.id, avatarURL: downloadURL.absoluteString)
+                try await groupService.updateGroupAvatar(groupId: group.id, avatarURL: imageURL)
+                
+                // Refresh the user's groups to update the avatar in the main GroupsView
+                try await groupService.fetchUserGroups()
                 
                 await MainActor.run {
                     isUploadingImage = false
+                    
+                    // Notify parent view to refresh the UI for other screens
+                    NotificationCenter.default.post(name: NSNotification.Name("GroupDataChanged"), object: nil)
                 }
             } catch {
                 await MainActor.run {

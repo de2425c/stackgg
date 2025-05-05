@@ -1353,6 +1353,7 @@ struct ShareHandView: View {
     @State private var isLoading = false
     @FocusState private var isTextEditorFocused: Bool
     @Binding var showingReplay: Bool
+    @State private var isSharing = false
     
     private var heroName: String? {
         hand.raw.players.first(where: { $0.isHero })?.name
@@ -1541,35 +1542,15 @@ struct ShareHandView: View {
                 )
                 try await postService.fetchPosts()
                 DispatchQueue.main.async {
-                    // Dismiss the share sheet
+                    isLoading = false
                     dismiss()
-                    // Close the replayer
-                    showingReplay = false
-                    
-                    // Navigate to the feed tab
-                    navigateToFeedTab()
                 }
             } catch {
                 print("Error sharing hand: \(error)")
+                DispatchQueue.main.async {
+                    isLoading = false
+                }
             }
-            isLoading = false
         }
-    }
-    
-    private func navigateToFeedTab() {
-        // Find the top-most view controller
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else {
-            return
-        }
-        
-        // Access the TabView controller in HomePage
-        var current = rootVC
-        while let presented = current.presentedViewController {
-            current = presented
-        }
-        
-        // Post a notification to tell HomePage to switch to the feed tab
-        NotificationCenter.default.post(name: NSNotification.Name("SwitchToFeedTab"), object: nil)
     }
 } 
