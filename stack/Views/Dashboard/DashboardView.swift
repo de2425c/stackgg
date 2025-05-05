@@ -263,7 +263,9 @@ struct AnalyticsCard: View {
                     HStack(spacing: 8) {
                         ForEach(heroCards, id: \.self) { card in
                             CardView(card: Card(from: card))
+                                .aspectRatio(0.69, contentMode: .fit)
                                 .frame(width: 32, height: 46)
+                                .shadow(color: .black.opacity(0.7), radius: 1, x: 0, y: 1)
                         }
                     }
                 }

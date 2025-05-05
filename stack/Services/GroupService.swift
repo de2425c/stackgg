@@ -570,6 +570,36 @@ class GroupService: ObservableObject {
         return httpsUrlString
     }
     
+    // Update the group avatar URL directly
+    func updateGroupAvatar(groupId: String, avatarURL: String) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw GroupServiceError.notAuthenticated
+        }
+        
+        // Check if the user is the group owner
+        let groupDoc = try await db.collection("groups")
+            .document(groupId)
+            .getDocument()
+        
+        guard let groupData = groupDoc.data(),
+              let ownerId = groupData["ownerId"] as? String,
+              ownerId == userId else {
+            throw GroupServiceError.permissionDenied
+        }
+        
+        // Update the group's avatarURL field
+        try await db.collection("groups")
+            .document(groupId)
+            .updateData(["avatarURL": avatarURL])
+        
+        // Update the group in the local list
+        await MainActor.run {
+            if let index = self.userGroups.firstIndex(where: { $0.id == groupId }) {
+                self.userGroups[index].avatarURL = avatarURL
+            }
+        }
+    }
+    
     // MARK: - Chat Methods
     
     // Fetch messages for a group with pagination
