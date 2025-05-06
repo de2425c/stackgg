@@ -930,6 +930,107 @@ class GroupService: ObservableObject {
         // Save the message
         try await messageRef.setData(messageData)
     }
+    
+    // Add sendHomeGameMessage function
+    func sendHomeGameMessage(groupId: String, homeGame: HomeGame) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw GroupServiceError.notAuthenticated
+        }
+        
+        // Get the user's info
+        let userDoc = try await db.collection("users").document(userId).getDocument()
+        guard let userData = userDoc.data() else {
+            throw GroupServiceError.invalidData
+        }
+        
+        let username = userData["username"] as? String ?? "Unknown"
+        let displayName = userData["displayName"] as? String
+        let senderName = displayName ?? username
+        let avatarURL = userData["avatarURL"] as? String
+        
+        // First, store the home game in Firestore
+        let homeGameRef = db.collection("homeGames").document(homeGame.id)
+        try await homeGameRef.setData([
+            "id": homeGame.id,
+            "title": homeGame.title,
+            "createdAt": Timestamp(date: homeGame.createdAt),
+            "creatorId": homeGame.creatorId,
+            "creatorName": homeGame.creatorName,
+            "groupId": homeGame.groupId,
+            "status": homeGame.status.rawValue,
+            "players": homeGame.players.map { player in
+                [
+                    "id": player.id,
+                    "userId": player.userId,
+                    "displayName": player.displayName,
+                    "currentStack": player.currentStack,
+                    "totalBuyIn": player.totalBuyIn,
+                    "joinedAt": Timestamp(date: player.joinedAt),
+                    "status": player.status.rawValue
+                ]
+            },
+            "buyInRequests": homeGame.buyInRequests.map { request in
+                [
+                    "id": request.id,
+                    "userId": request.userId,
+                    "displayName": request.displayName,
+                    "amount": request.amount,
+                    "requestedAt": Timestamp(date: request.requestedAt),
+                    "status": request.status.rawValue
+                ]
+            },
+            "cashOutRequests": homeGame.cashOutRequests.map { request in
+                [
+                    "id": request.id,
+                    "userId": request.userId,
+                    "displayName": request.displayName,
+                    "amount": request.amount,
+                    "requestedAt": Timestamp(date: request.requestedAt),
+                    "processedAt": request.processedAt.map { Timestamp(date: $0) },
+                    "status": request.status.rawValue
+                ]
+            },
+            "gameHistory": homeGame.gameHistory.map { event in
+                [
+                    "id": event.id,
+                    "timestamp": Timestamp(date: event.timestamp),
+                    "eventType": event.eventType.rawValue,
+                    "userId": event.userId,
+                    "userName": event.userName,
+                    "amount": event.amount,
+                    "description": event.description
+                ]
+            }
+        ])
+        
+        // Create the message document
+        let messageRef = db.collection("groups")
+            .document(groupId)
+            .collection("messages")
+            .document()
+        
+        let timestamp = Timestamp(date: Date())
+        
+        let messageData: [String: Any] = [
+            "groupId": groupId,
+            "senderId": userId,
+            "senderName": senderName,
+            "senderAvatarURL": avatarURL as Any,
+            "timestamp": timestamp,
+            "messageType": GroupMessage.MessageType.homeGame.rawValue,
+            "homeGameId": homeGame.id,
+            "title": homeGame.title
+        ]
+        
+        // Save the message
+        try await messageRef.setData(messageData)
+        
+        // Update the group's last message information
+        try await db.collection("groups").document(groupId).updateData([
+            "lastMessageAt": FieldValue.serverTimestamp(),
+            "lastMessageType": GroupMessage.MessageType.homeGame.rawValue
+        ])
+    }
 }
 
 enum GroupServiceError: Error, CustomStringConvertible {

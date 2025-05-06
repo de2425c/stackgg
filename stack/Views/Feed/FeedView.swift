@@ -18,7 +18,21 @@ struct FeedView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    AppHeaderView.standard(title: "Feed")
+                    HStack(alignment: .center) {
+                        Text("Feed")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        Button(action: {}) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {

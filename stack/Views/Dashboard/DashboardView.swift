@@ -26,27 +26,7 @@ struct DashboardView: View {
                     // Use the standard factory method
                     AppHeaderView.standard(title: "Dashboard")
 
-                    // Top Tab Bar
-                    HStack(spacing: 24) {
-                        Spacer()
-                        ForEach(0..<tabs.count, id: \.self) { index in
-                            TabButton(
-                                title: tabs[index],
-                                isSelected: selectedTab == index
-                            ) {
-                                withAnimation {
-                                    selectedTab = index
-                                }
-                            }
-                            .frame(minWidth: 60)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 8)
-                    .padding(.horizontal)
-                    .background(Color.clear)
-                    
-                    // Content
+                    // Content - TabView without visible tab bar
                     TabView(selection: $selectedTab) {
                         AnalyticsView(sessionStore: sessionStore, handStore: handStore)
                             .tag(0)

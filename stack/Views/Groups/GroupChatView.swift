@@ -32,6 +32,7 @@ extension View {
 struct GroupChatView: View {
     @Environment(\.dismiss) var dismiss
     private let groupService = GroupService()
+    private let homeGameService = HomeGameService()
     @EnvironmentObject private var handStore: HandStore
     @EnvironmentObject private var postService: PostService
     @EnvironmentObject private var userService: UserService
@@ -42,6 +43,7 @@ struct GroupChatView: View {
     @State private var messageText = ""
     @State private var showingImagePicker = false
     @State private var showingHandPicker = false
+    @State private var showingHomeGameView = false
     @State private var selectedImage: UIImage?
     @State private var imagePickerItem: PhotosPickerItem?
     @State private var isLoadingMessages = false
@@ -65,6 +67,11 @@ struct GroupChatView: View {
     @State private var renderEndTime = Date()
     
     let group: UserGroup
+    
+    // Add pinnedHomeGame state
+    @State private var pinnedHomeGame: HomeGame?
+    @State private var isPinnedGameLoading = false
+    @State private var showingPinnedGameDetail = false
     
     // Enum to track view state
     enum ViewState {
@@ -132,6 +139,69 @@ struct GroupChatView: View {
                             .padding(.bottom, 8)
                             .background(Color.black.opacity(0.5))
                             
+                            // Pinned home game (if any)
+                            if isPinnedGameLoading {
+                                HStack {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    
+                                    Text("Loading active game...")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.gray)
+                                        .padding(.leading, 8)
+                                    
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(UIColor(red: 25/255, green: 27/255, blue: 32/255, alpha: 1.0)))
+                            } else if let pinnedGame = pinnedHomeGame {
+                                Button(action: {
+                                    // Action to show game detail sheet
+                                    showingPinnedGameDetail = true
+                                }) {
+                                    HStack {
+                                        // Game icon
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color(UIColor(red: 40/255, green: 60/255, blue: 40/255, alpha: 1.0)))
+                                                .frame(width: 32, height: 32)
+                                            
+                                            Image(systemName: "house.fill")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(pinnedGame.title)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.white)
+                                            
+                                            Text("\(pinnedGame.players.filter { $0.status == .active }.count) active players")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding(.leading, 8)
+                                        
+                                        Spacer()
+                                        
+                                        Text("ACTIVE")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(.black)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 2)
+                                            .background(
+                                                Capsule()
+                                                    .fill(Color(red: 123/255, green: 255/255, blue: 99/255))
+                                            )
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(UIColor(red: 25/255, green: 27/255, blue: 32/255, alpha: 1.0)))
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                            
                             // Chat messages
                             ScrollViewReader { scrollView in
                                 ScrollView {
@@ -177,6 +247,14 @@ struct GroupChatView: View {
                                         scrollView.scrollTo("bottomAnchor", anchor: .bottom)
                                     }
                                 }
+                                .onChange(of: scrollToBottom) { newValue in
+                                    if newValue {
+                                        withAnimation {
+                                            scrollView.scrollTo("bottomAnchor", anchor: .bottom)
+                                            scrollToBottom = false
+                                        }
+                                    }
+                                }
                                 .onAppear {
                                     withAnimation {
                                         scrollView.scrollTo("bottomAnchor", anchor: .bottom)
@@ -190,74 +268,33 @@ struct GroupChatView: View {
                                     .background(Color.gray.opacity(0.3))
                                 
                                 HStack(spacing: 12) {
-                                    // Image button
-                                    ZStack {
-                                        PhotosPicker(selection: $imagePickerItem, matching: .images) {
-                                            Image(systemName: isSendingImage ? "hourglass" : "photo")
-                                                .font(.system(size: 20))
-                                                .foregroundColor(.white)
-                                                .frame(width: 32, height: 32)
-                                                .background(Color(UIColor(red: 50/255, green: 50/255, blue: 55/255, alpha: 1.0)))
-                                                .cornerRadius(16)
+                                    // + Button with menu
+                                    Menu {
+                                        Button(action: {
+                                            // Show photo picker
+                                            imagePickerItem = nil // Reset any previous selection
+                                            showingImagePicker = true
+                                        }) {
+                                            Label("Photo", systemImage: "photo")
                                         }
                                         
-                                        if isSendingImage {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                                .scaleEffect(0.7)
+                                        Button(action: {
+                                            // Show hand history picker
+                                            showingHandPicker = true
+                                        }) {
+                                            Label("Hands", systemImage: "doc.text")
                                         }
-                                    }
-                                    .onChange(of: imagePickerItem) { newItem in
-                                        Task {
-                                            do {
-                                                print("IMAGE: Starting image transfer at \(Date().formatted())")
-                                                
-                                                guard let newItem = newItem else {
-                                                    print("IMAGE: No item selected")
-                                                    return
-                                                }
-                                                
-                                                let data = try await newItem.loadTransferable(type: Data.self)
-                                                
-                                                guard let data = data else {
-                                                    print("IMAGE: Failed to load image data")
-                                                    throw NSError(domain: "ImageLoading", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not load image data"])
-                                                }
-                                                
-                                                guard let image = UIImage(data: data) else {
-                                                    print("IMAGE: Failed to create UIImage from data")
-                                                    throw NSError(domain: "ImageLoading", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not create image from data"])
-                                                }
-                                                
-                                                print("IMAGE: Successfully loaded image: \(image.size.width)x\(image.size.height)")
-                                                
-                                                // Clean up the picker item to allow selecting the same image again
-                                                await MainActor.run {
-                                                    imagePickerItem = nil
-                                                    selectedImage = image
-                                                    sendImage(image)
-                                                }
-                                            } catch {
-                                                print("IMAGE ERROR: \(error.localizedDescription)")
-                                                await MainActor.run {
-                                                    self.error = "Failed to load image: \(error.localizedDescription)"
-                                                    self.showError = true
-                                                    imagePickerItem = nil
-                                                }
-                                            }
+                                        
+                                        Button(action: {
+                                            // Show home game view
+                                            showingHomeGameView = true
+                                        }) {
+                                            Label("Home Game", systemImage: "house")
                                         }
-                                    }
-                                    
-                                    // Hand history button
-                                    Button(action: {
-                                        showingHandPicker = true
-                                    }) {
-                                        Image(systemName: "doc.text")
-                                            .font(.system(size: 20))
+                                    } label: {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 24))
                                             .foregroundColor(.white)
-                                            .frame(width: 32, height: 32)
-                                            .background(Color(UIColor(red: 50/255, green: 50/255, blue: 55/255, alpha: 1.0)))
-                                            .cornerRadius(16)
                                     }
                                     
                                     // Text input
@@ -295,6 +332,15 @@ struct GroupChatView: View {
                         }
                         .safeAreaInset(edge: .bottom) {
                             Color.clear.frame(height: 0)
+                        }
+                        .ignoresSafeArea(.keyboard, edges: .bottom)
+                        .onAppear {
+                            // Add keyboard observer
+                            NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
+                                withAnimation {
+                                    scrollToBottom = true
+                                }
+                            }
                         }
                         .onViewLifecycle(appeared: "Ready state")
                         
@@ -359,9 +405,19 @@ struct GroupChatView: View {
             // Clean up subscriptions
             cancellables.forEach { $0.cancel() }
             cancellables.removeAll()
+            
+            // Clean up keyboard observers
+            NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
         }
         .sheet(isPresented: $showingGroupInfo) {
             GroupDetailView(group: group)
+        }
+        .sheet(isPresented: $showingPinnedGameDetail) {
+            if let gameToView = pinnedHomeGame {
+                HomeGameDetailView(game: gameToView)
+            } else {
+                Text("Unable to load game details.")
+            }
         }
         .sheet(isPresented: $showingHandPicker) {
             HandHistorySelectionView { handId in
@@ -371,6 +427,61 @@ struct GroupChatView: View {
             .environmentObject(handStore)
             .environmentObject(postService)
             .environmentObject(userService)
+        }
+        .sheet(isPresented: $showingHomeGameView) {
+            HomeGameView(groupId: group.id, onGameCreated: { game in
+                // Create and send home game message
+                sendHomeGameMessage(game)
+                showingHomeGameView = false
+            })
+            .environmentObject(userService)
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            PhotosPicker(selection: $imagePickerItem, matching: .images) {
+                Text("Select Photo")
+            }
+            .onChange(of: imagePickerItem) { newItem in
+                Task {
+                    do {
+                        print("IMAGE: Starting image transfer at \(Date().formatted())")
+                        
+                        guard let newItem = newItem else {
+                            print("IMAGE: No item selected")
+                            return
+                        }
+                        
+                        let data = try await newItem.loadTransferable(type: Data.self)
+                        
+                        guard let data = data else {
+                            print("IMAGE: Failed to load image data")
+                            throw NSError(domain: "ImageLoading", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not load image data"])
+                        }
+                        
+                        guard let image = UIImage(data: data) else {
+                            print("IMAGE: Failed to create UIImage from data")
+                            throw NSError(domain: "ImageLoading", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not create image from data"])
+                        }
+                        
+                        print("IMAGE: Successfully loaded image: \(image.size.width)x\(image.size.height)")
+                        
+                        // Clean up the picker item to allow selecting the same image again
+                        await MainActor.run {
+                            imagePickerItem = nil
+                            selectedImage = image
+                            sendImage(image)
+                            showingImagePicker = false
+                        }
+                    } catch {
+                        print("IMAGE ERROR: \(error.localizedDescription)")
+                        await MainActor.run {
+                            self.error = "Failed to load image: \(error.localizedDescription)"
+                            self.showError = true
+                            imagePickerItem = nil
+                            showingImagePicker = false
+                        }
+                    }
+                }
+            }
         }
         .alert(isPresented: $showError) {
             Alert(
@@ -434,6 +545,9 @@ struct GroupChatView: View {
                 isLoadingMessages = false
                 viewState = .ready
                 
+                // Look for active home games to pin
+                loadActiveHomeGame()
+                
                 let uiEnd = Date()
             }
         } catch {
@@ -446,6 +560,71 @@ struct GroupChatView: View {
                 viewState = .error(error.localizedDescription)
             }
         }
+    }
+    
+    // Load and pin the most recent active home game
+    private func loadActiveHomeGame() {
+        // First, find if there's a home game message
+        isPinnedGameLoading = true
+        
+        Task {
+            do {
+                // Use HomeGameService to fetch active games for this group
+                let activeGames = try await homeGameService.fetchActiveGamesForGroup(groupId: group.id)
+                
+                await MainActor.run {
+                    // Find the most recent active game
+                    if let mostRecentGame = activeGames.first {
+                        // Pin the most recent active game
+                        self.pinnedHomeGame = mostRecentGame
+                    } else {
+                        // No active games found
+                        self.pinnedHomeGame = nil
+                    }
+                    
+                    self.isPinnedGameLoading = false
+                }
+            } catch {
+                print("Error loading active home games: \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    self.isPinnedGameLoading = false
+                    self.pinnedHomeGame = nil
+                }
+            }
+        }
+        
+        // Alternatively, we can search for home game messages in the existing messages
+        // and fetch the game details from there if the HomeGameService approach doesn't work
+        /*
+        for message in messages.sorted(by: { $0.timestamp > $1.timestamp }) {
+            if message.messageType == .homeGame, let gameId = message.homeGameId {
+                Task {
+                    do {
+                        if let game = try await homeGameService.fetchHomeGame(gameId: gameId) {
+                            if game.status == .active {
+                                await MainActor.run {
+                                    self.pinnedHomeGame = game
+                                    self.isPinnedGameLoading = false
+                                }
+                                return
+                            }
+                        }
+                    } catch {
+                        print("Error loading home game: \(error.localizedDescription)")
+                    }
+                }
+                break // Only try the most recent home game message
+            }
+        }
+        
+        // If we get here and still loading, no active game was found
+        if isPinnedGameLoading {
+            DispatchQueue.main.async {
+                self.isPinnedGameLoading = false
+            }
+        }
+        */
     }
     
     private func loadMessages() {
@@ -510,6 +689,19 @@ struct GroupChatView: View {
         Task {
             do {
                 try await groupService.sendHandMessage(groupId: group.id, handHistoryId: handId)
+            } catch {
+                await MainActor.run {
+                    self.error = error.localizedDescription
+                    self.showError = true
+                }
+            }
+        }
+    }
+    
+    private func sendHomeGameMessage(_ game: HomeGame) {
+        Task {
+            do {
+                try await groupService.sendHomeGameMessage(groupId: group.id, homeGame: game)
             } catch {
                 await MainActor.run {
                     self.error = error.localizedDescription
@@ -606,6 +798,14 @@ struct MessageRow: View {
                         if let handId = message.handHistoryId {
                             // Simple hand history preview for chat
                             ChatHandPreview(handId: handId, ownerUserId: message.handOwnerUserId ?? message.senderId)
+                        }
+                        
+                    case .homeGame:
+                        if let gameId = message.homeGameId {
+                            // Home game preview
+                            HomeGamePreview(gameId: gameId, 
+                                           ownerId: message.senderId, 
+                                           groupId: message.groupId)
                         }
                     }
                 }

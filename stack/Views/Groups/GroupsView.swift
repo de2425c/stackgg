@@ -1156,19 +1156,7 @@ struct InviteCard: View {
     }
 }
 
-// Helper extension for placeholder text
-extension View {
-    func placeholder<Content: View>(
-        when shouldShow: Bool,
-        alignment: Alignment = .leading,
-        @ViewBuilder placeholder: () -> Content
-    ) -> some View {
-        ZStack(alignment: alignment) {
-            placeholder().opacity(shouldShow ? 1 : 0)
-            self
-        }
-    }
-}
+
 
 // LottieView placeholder - you would need to add the Lottie package
 // This is a simplified version until you add the real implementation
