@@ -18,10 +18,11 @@ struct FeedView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    HStack(alignment: .center) {
+                    HStack {
                         Text("Feed")
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
+                            .padding(.leading, 16)
                         
                         Spacer()
                         
@@ -29,10 +30,11 @@ struct FeedView: View {
                             Image(systemName: "bell")
                                 .font(.system(size: 20))
                                 .foregroundColor(.white)
+                                .padding(.trailing, 16)
                         }
                     }
-                    .padding(.horizontal, 16)
                     .padding(.vertical, 8)
+                    .frame(height: 48)
                     
                     ScrollView {
                         RefreshControl(isRefreshing: $isRefreshing) {
