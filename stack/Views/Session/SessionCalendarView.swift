@@ -4,9 +4,7 @@ import FirebaseFirestore
 struct SessionCalendarView: View {
     @ObservedObject var sessionStore: SessionStore
     @State private var displayDate = Date() // Controls the month being viewed
-    @State private var sessionToShare: Session? = nil
-    @State private var sessionToShowDetails: Session? = nil
-    @State private var isCalendarExpanded = true // State to control calendar visibility
+    @State private var selectedSessionForSharing: Session? = nil
     
     // Group sessions by day for the currently displayed month
     private var sessionsByDay: [Date: Double] {
@@ -68,7 +66,7 @@ struct SessionCalendarView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Header: Month/Year & Profit (Left) | Navigation & Toggle (Right)
+            // Header: Month/Year & Profit (Left) | Navigation (Right)
             HStack {
                 VStack(alignment: .leading) {
                     Text("\(displayDate, formatter: monthYearFormatter)")
@@ -80,15 +78,7 @@ struct SessionCalendarView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 16) { // Group navigation and toggle buttons
-                    Button {
-                        withAnimation {
-                            isCalendarExpanded.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "calendar") // Calendar icon as toggle
-                    }
-
+                HStack(spacing: 16) { // Group navigation buttons
                     Button {
                         changeMonth(by: -1)
                     } label: {
@@ -105,53 +95,44 @@ struct SessionCalendarView: View {
             .padding(.horizontal)
             .foregroundColor(.white)
             
-            // Conditionally display calendar elements with animation
-            if isCalendarExpanded {
-                VStack {
-                    // Weekday Headers
-                    HStack {
-                        ForEach(weekdaySymbols, id: \.self) { symbol in
-                            Text(symbol)
-                                .font(.caption)
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    
-                    // Calendar Grid
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(daysInMonth.indices, id: \.self) { index in
-                            let date = daysInMonth[index]
-                            let profit = date != nil ? sessionsByDay[Calendar.current.startOfDay(for: date!)] : nil
-                            DayCellView(date: date, profit: profit)
-                        }
+            // Wrap calendar elements in a VStack with padding
+            VStack {
+                // Weekday Headers
+                HStack {
+                    ForEach(weekdaySymbols, id: \.self) { symbol in
+                        Text(symbol)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.gray)
                     }
                 }
-                .padding(.horizontal) // Add standard horizontal padding to the container
-                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .scale.combined(with: .opacity))) // Smooth transition
+                
+                // Calendar Grid
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(daysInMonth.indices, id: \.self) { index in
+                        let date = daysInMonth[index]
+                        let profit = date != nil ? sessionsByDay[Calendar.current.startOfDay(for: date!)] : nil
+                        DayCellView(date: date, profit: profit)
+                    }
+                }
             }
+            .padding(.horizontal) // Add standard horizontal padding to the container
             
             // Session List for the selected month
             List {
                 ForEach(sessionsForDisplayedMonth) { session in
-                    SessionSummaryRow(session: session,
-                                      onTapAction: { self.sessionToShowDetails = session }
-                    )
+                    Button(action: {
+                        self.selectedSessionForSharing = session
+                    }) {
+                        SessionSummaryRow(session: session)
+                    }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
             }
             .listStyle(.plain)
             .background(Color.clear)
-            .sheet(item: $sessionToShowDetails) { session in
-                SessionDetailsView(
-                    session: session,
-                    onShare: { self.sessionToShare = session },
-                    sessionStore: sessionStore
-                )
-                .presentationDetents([.medium])
-            }
-            .fullScreenCover(item: $sessionToShare) { session in
+            .fullScreenCover(item: $selectedSessionForSharing) { session in
                 NavigationView {
                     SessionShareEditorView(viewModel: SessionShareViewModel(session: session))
                 }
@@ -159,7 +140,6 @@ struct SessionCalendarView: View {
         }
         .padding(.top)
         .background(Color.clear) // Ensure transparent background
-        .animation(.default, value: isCalendarExpanded) // Animate changes based on expansion state
     }
     
     // Helper to get sessions for the currently displayed month

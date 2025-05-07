@@ -35,6 +35,29 @@ struct HomePage: View {
     
     var body: some View {
         ZStack {
+            // Background that excludes the tab bar central button
+            ZStack {
+                // Full screen material blur
+                Color.black.opacity(0.5)
+                    .background(.thinMaterial)
+                    .ignoresSafeArea()
+                
+                // Cutout for the + button - positioned at center bottom
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(Color.black.opacity(0.01)) // Nearly transparent
+                            .blendMode(.destinationOut) // This creates the "hole" effect
+                            .frame(width: 70, height: 70)
+                        Spacer()
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .compositingGroup() // Ensures the blendMode works properly
+            
             // Dim overlay to darken screen outside the menu
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
@@ -77,6 +100,7 @@ struct HomePage: View {
                 .background(Color.clear)
                 .toolbar(.hidden, for: .tabBar)
             }
+            .background(Color.clear)
 
             CustomTabBar(
                 selectedTab: $selectedTab,
@@ -96,6 +120,7 @@ struct HomePage: View {
                 .zIndex(1)
             }
         }
+        .ignoresSafeArea(edges: .bottom)
         .ignoresSafeArea(.keyboard)
         .fullScreenCover(isPresented: $showingReplay) {
             if let hand = replayHand {
@@ -118,59 +143,52 @@ struct CustomTabBar: View {
     @Binding var showingMenu: Bool
     
     var body: some View {
-        VStack(spacing: 0) { 
-            // Removed the inner Color view
-            
-            // This VStack holds the actual buttons
-            VStack(spacing: 0) { 
-                HStack(spacing: 0) {
-                    Spacer(minLength: 6)
-                    TabBarButton(
-                        icon: "Dashboard",
-                        title: "Dashboard",
-                        isSelected: selectedTab == .dashboard
-                    ) { selectedTab = .dashboard }
-                    TabBarButton(
-                        icon: "Feed",
-                        title: "Feed",
-                        isSelected: selectedTab == .feed
-                    ) { selectedTab = .feed }
-                    Spacer(minLength: 0)
-                    ZStack {
-                        Color.clear.frame(width: 1, height: 1)
-                        AddButton(userId: userId, showingMenu: $showingMenu)
-                            .offset(y: -24)
+        VStack(spacing: 0) {
+            // Background - Change to clear
+            Color.clear
+                .frame(height: 65)
+                .overlay(
+                    VStack(spacing: 0) {
+                        HStack(spacing: 0) {
+                            Spacer(minLength: 6)
+                            TabBarButton(
+                                icon: "Dashboard",
+                                title: "Dashboard",
+                                isSelected: selectedTab == .dashboard
+                            ) { selectedTab = .dashboard }
+                            TabBarButton(
+                                icon: "Feed",
+                                title: "Feed",
+                                isSelected: selectedTab == .feed
+                            ) { selectedTab = .feed }
+                            Spacer(minLength: 0)
+                            ZStack {
+                                Color.clear.frame(width: 1, height: 1)
+                                AddButton(userId: userId, showingMenu: $showingMenu)
+                                    .offset(y: -24)
+                            }
+                            .frame(width: 80, alignment: .center)
+                            Spacer(minLength: 0)
+                            TabBarButton(
+                                icon: "Groups",
+                                title: "Groups",
+                                isSelected: selectedTab == .groups
+                            ) { selectedTab = .groups }
+                            TabBarButton(
+                                icon: "Profile",
+                                title: "Profile",
+                                isSelected: selectedTab == .profile
+                            ) { selectedTab = .profile }
+                            Spacer(minLength: 6)
+                        }
+                        .padding(.horizontal, 0)
+                        .padding(.top, 8)
+                        .padding(.bottom, 22)
                     }
-                    .frame(width: 80, alignment: .center)
-                    Spacer(minLength: 0)
-                    TabBarButton(
-                        icon: "Groups",
-                        title: "Groups",
-                        isSelected: selectedTab == .groups
-                    ) { selectedTab = .groups }
-                    TabBarButton(
-                        icon: "Profile",
-                        title: "Profile",
-                        isSelected: selectedTab == .profile
-                    ) { selectedTab = .profile }
-                    Spacer(minLength: 6)
-                }
-                .padding(.horizontal, 0)
-                .padding(.top, 8)
-                .padding(.bottom, 22) // Adjust padding if needed based on safe area
-            }
-             // Keep a reasonable height for the button area
-            .frame(height: 65)
-
+                )
         }
-        // Remove fixed height from outer VStack, let content + background determine it
-        // .frame(height: 78) 
+        .frame(height: 78)
         .frame(maxWidth: .infinity)
-        // Apply background to the outer VStack and ignore safe area
-        .background(
-             Color(red: 0.05, green: 0.05, blue: 0.09) // Solid dark color
-                .ignoresSafeArea(edges: .bottom)
-        )
     }
 }
 
@@ -1289,6 +1307,29 @@ struct AddMenuOverlay: View {
 
     var body: some View {
         ZStack {
+            // Background that excludes the tab bar central button
+            ZStack {
+                // Full screen material blur
+                Color.black.opacity(0.5)
+                    .background(.thinMaterial)
+                    .ignoresSafeArea()
+                
+                // Cutout for the + button - positioned at center bottom
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(Color.black.opacity(0.01)) // Nearly transparent
+                            .blendMode(.destinationOut) // This creates the "hole" effect
+                            .frame(width: 70, height: 70)
+                        Spacer()
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .compositingGroup() // Ensures the blendMode works properly
+            
             // Dim overlay to darken screen outside the menu
             Color.black.opacity(0.3)
                 .ignoresSafeArea()

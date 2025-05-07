@@ -258,6 +258,31 @@ struct ProfitGraph: View {
                 // Remove outer padding to allow edges to extend fully
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
+                        // Grid background - extend lines fully to edges
+                        VStack(spacing: 0) {
+                            ForEach(0..<5) { i in
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.15))
+                                    .frame(height: 1)
+                                    .frame(maxWidth: .infinity) // Ensure full width
+                                if i < 4 { Spacer() }
+                            }
+                        }
+                        .frame(maxWidth: .infinity) // Ensure full width
+                        .padding(.horizontal, -20) // Extend past safe area
+                        
+                        // Vertical grid lines
+                        HStack(spacing: 0) {
+                            ForEach(0..<displayDates.count, id: \.self) { i in
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.1))
+                                    .frame(width: 1)
+                                if i < displayDates.count - 1 {
+                                    Spacer()
+                                }
+                            }
+                        }
+                        
                         // Line chart - use full width
                         ZStack(alignment: .leading) {
                             // Area below line (subtle gradient)
@@ -314,12 +339,25 @@ struct ProfitGraph: View {
                                 }
                             }
                             .stroke(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)), lineWidth: 2)
+                            
+                            // Overlay points
+                            ForEach(0..<profitValues.count, id: \.self) { i in
+                                let barWidth = geometry.size.width / CGFloat(max(1, profitValues.count - 1))
+                                let x = CGFloat(i) * barWidth
+                                let y = geometry.size.height * (1 - CGFloat((profitValues[i] - valueRange.lowerBound) / (valueRange.upperBound - valueRange.lowerBound)))
+                                
+                                Circle()
+                                    .fill(Color(UIColor(red: 123/255, green: 255/255, blue: 99/255, alpha: 1.0)))
+                                    .frame(width: 6, height: 6)
+                                    .position(x: x, y: y)
+                            }
                         }
                     }
                 }
                 .frame(height: 250)
                 .edgesIgnoringSafeArea([.leading, .trailing]) // Ignore safe area on sides
                 .padding(.top, 8)
+                .padding(.horizontal, 0)
                 
                 // X-axis dates (simplified, centered)
                 HStack(spacing: 0) {

@@ -67,6 +67,7 @@ struct AnalyticsView: View {
                 .padding(.vertical, 0)
                 .background(Color.clear)
                 .cornerRadius(16)
+                .padding(.horizontal)
                 
                 // Selected Hands section
                 VStack(alignment: .leading, spacing: 16) {
