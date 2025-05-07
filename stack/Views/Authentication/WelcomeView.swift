@@ -8,8 +8,9 @@ struct WelcomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Apply new background view
-                AppBackgroundView()
+                // Background color matching the dark theme from mockup
+                Color(UIColor(red: 22/255, green: 23/255, blue: 26/255, alpha: 1.0))
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 24) {
                     // Logo/Image section

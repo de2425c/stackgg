@@ -4,21 +4,15 @@ struct HandsListView: View {
     @ObservedObject var handStore: HandStore
     
     var body: some View {
-        ZStack {
-            // Apply new background view
-            AppBackgroundView()
-                
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(handStore.savedHands) { savedHand in
-                        HandSummaryRow(hand: savedHand.hand, id: savedHand.id)
-                            .background(Color.clear)
-                            .cornerRadius(12)
-                            .environmentObject(handStore)
-                    }
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(handStore.savedHands) { savedHand in
+                    HandSummaryRow(hand: savedHand.hand)
+                        .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
+                        .cornerRadius(12)
                 }
-                .padding()
             }
+            .padding()
         }
     }
 }

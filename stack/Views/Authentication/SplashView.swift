@@ -6,8 +6,8 @@ struct SplashView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Apply new background view
-                AppBackgroundView()
+                Color("Background")
+                    .ignoresSafeArea()
                 
                 Image("StackLogo")
                     .resizable()

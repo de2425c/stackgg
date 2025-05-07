@@ -80,8 +80,8 @@ struct HandReplayView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Apply new background view
-                AppBackgroundView()
+                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Back and share buttons at the top
@@ -91,7 +91,7 @@ struct HandReplayView: View {
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(12)
-                                .background(Color.clear)
+                                .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
                         }
                         .padding(.leading, 16)
@@ -102,7 +102,7 @@ struct HandReplayView: View {
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(12)
-                                .background(Color.clear)
+                                .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
                         }
                         .padding(.trailing, 16)
@@ -1330,7 +1330,7 @@ struct ActionLogView: View {
             }
             .padding()
         }
-        .background(Color.clear) // Fully transparent
+        .background(Color.black.opacity(0.3))
         .cornerRadius(12)
     }
 }

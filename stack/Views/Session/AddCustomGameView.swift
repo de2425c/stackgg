@@ -12,7 +12,8 @@ struct AddCustomGameView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                AppBackgroundView()
+                Color(UIColor(red: 10/255, green: 10/255, blue: 15/255, alpha: 1.0))
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 24) {
                     Text("Add Custom Game")
