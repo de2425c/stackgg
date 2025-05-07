@@ -23,9 +23,6 @@ struct DashboardView: View {
                 AppBackgroundView()
                 
                 VStack(spacing: 0) {
-                    // Remove the AppHeaderView
-                    // AppHeaderView.standard(title: "Dashboard")
-
                     // Top Tab Bar
                     HStack(spacing: 24) {
                         Spacer()
@@ -64,7 +61,6 @@ struct DashboardView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                /*
                 ToolbarItem(placement: .navigationBarLeading) {
                     // Use Profile Image instead of default icon
                     if let profile = userService.currentUserProfile, let urlString = profile.avatarURL, let url = URL(string: urlString) {
@@ -86,7 +82,6 @@ struct DashboardView: View {
                         .foregroundColor(.white)
                         .font(.system(size: 20))
                 }
-                */
             }
             // Hide the default navigation bar background
             .toolbarBackground(.hidden, for: .navigationBar)
