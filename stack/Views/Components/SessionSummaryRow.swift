@@ -3,7 +3,6 @@ import FirebaseFirestore
 
 struct SessionSummaryRow: View {
     let session: Session
-    @State private var isShowingShareEditor = false // State to trigger the cover
     
     private func formatMoney(_ amount: Double) -> String {
         return "$\(Int(amount))"
@@ -91,16 +90,5 @@ struct SessionSummaryRow: View {
                 )
                 .shadow(color: Color.black.opacity(0.2), radius: 4, y: 2)
         )
-        .contentShape(Rectangle()) // Make the whole VStack tappable
-        .onTapGesture {
-            isShowingShareEditor = true
-        }
-        .fullScreenCover(isPresented: $isShowingShareEditor) {
-             // Present the editor modally
-             // Wrap the editor in its own NavigationView for the toolbar
-             NavigationView {
-                 SessionShareEditorView(viewModel: SessionShareViewModel(session: session))
-             }
-        }
     }
 } 
